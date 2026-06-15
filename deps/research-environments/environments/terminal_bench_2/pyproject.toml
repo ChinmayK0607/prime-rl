@@ -1,0 +1,25 @@
+[project]
+name = "terminal-bench-2"
+description = "Terminal-Bench 2.1 Harbor taskset with Terminus2 as the default harness"
+license = "MIT"
+tags = ["eval", "cli_agent", "harbor", "terminal-bench"]
+version = "0.2.1"
+requires-python = ">=3.10"
+dependencies = [
+    "verifiers[packages]>=0.1.15.dev17",
+    "prime-sandboxes>=0.2.19",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build]
+include = ["terminal_bench_2.py", "pyproject.toml", "README.md"]
+
+[tool.verifiers.eval]
+num_examples = 3
+rollouts_per_example = 1

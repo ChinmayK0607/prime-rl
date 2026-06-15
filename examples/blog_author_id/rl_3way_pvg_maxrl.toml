@@ -1,0 +1,108 @@
+# RUN 13 — ARM A (MaxRL). 3-way provider task (CLAUDE / CHATGPT / GEMINI), Qwen3.5-9B,
+# thinking OFF. Single 8x H100: 4 train (FSDP, HF impl) + 4 inference (vLLM tp=2 => dp=2).
+#
+# Hypothesis. The GEMINI collapse is an OPTIMIZATION pathology (proven: the boundary is
+# perfectly label-only separable), not a data ceiling. The Run-12 fix (entropy bonus) lifted
+# GEMINI 0.04 -> 0.27 (best val 0.398) but is an UNBOUNDED additive push on surprisal, so it
+# went verbose/looping after ~step32 (truncation 1%->88%). MaxRL (Tajwar 2026) attacks the
+# same problem from the ADVANTAGE side instead: it averages the score functions of SUCCESSFUL
+# rollouts only, with effective advantage A_i ∝ (r_i - r_hat)/r_hat (r_hat = success rate).
+# A success on a prompt the model rarely solves (small r_hat -> GEMINI) is up-weighted hard,
+# near-solved prompts get little push. It provably approximates maximum-likelihood (an
+# infinite harmonic mixture of pass@k gradients), improves pass@k, and preserves diversity
+# (anti-collapse) better than GRPO -- with NO unbounded verbosity incentive. This ties
+# straight to the original pass@4 framing.
+#
+# Single-variable change vs the entropy incumbent: SAME PvG curriculum, SAME non-greedy val,
+# SAME budget; ONLY the advantage fn changes (default DPPO loss, no entropy term) and the
+# default GRPO advantage (r - mean) is replaced by the MaxRL advantage. No length penalty:
+# MaxRL has no verbosity incentive (unlike the entropy bonus) and the orchestrator length
+# penalty is mutually exclusive with a custom advantage in this codebase. Limitation MaxRL
+# inherits: K=0 groups (no GEMINI success) give zero gradient -- the curriculum supplies the
+# first successes this estimator then amplifies. JUDGE BY per-class/macro recall, not reward.
+
+max_steps = 40
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+[inference.model]
+max_model_len = 16384
+reasoning_parser = "None"
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+# Default DPPO+KL loss (no entropy term). The anti-collapse pressure now comes entirely from
+# the MaxRL advantage, not from a loss-side entropy bonus.
+[trainer.loss]
+type = "default"
+
+[orchestrator]
+batch_size = 144
+group_size = 12
+
+# MaxRL advantage: hard-prompt-weighted, pass@k-aligned, diversity-preserving. adv_clip caps
+# the ultra-hard-prompt amplification (r_hat=1/N -> raw advantage N-1) to keep updates sane.
+[orchestrator.advantage]
+type = "custom"
+import_path = "prime_rl.orchestrator.advantage.maxrl_advantage"
+kwargs = { success_threshold = 0.5, adv_clip = 6.0 }
+
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_pvg", label_scheme = "provider3" }
+
+# Non-greedy val (temp 0.7 / top_p 0.95): greedy decoding loops on long blogs and never emits
+# <answer> (56-78% truncation), structurally suppressing GEMINI recall. Temp 0.7 breaks it.
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 4096
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_pvg", label_scheme = "provider3" }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-grpo-3way-pvg-maxrl"
+
+# Weights-only checkpoints (~17 GB), aligned to eval interval so the best-val janitor can map
+# a reward to each weights dir. Retention owned by scripts/ckpt_janitor.sh.
+[ckpt]
+interval = 4
+
+[trainer.ckpt]
+weights_only = true

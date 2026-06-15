@@ -111,6 +111,98 @@ def _efficiency_shaping(
     return shaped_rewards - shaped_rewards.mean()
 
 
+def maxrl_advantage(
+    inputs: AdvantageInputs,
+    *,
+    success_threshold: float = 0.5,
+    adv_clip: float = 6.0,
+    eps: float = 1e-8,
+) -> AdvantageOutputs:
+    """MaxRL advantage (Tajwar et al. 2026, "Maximum Likelihood RL").
+
+    Why (pass@k + hard-class emphasis): standard GRPO optimizes expected reward (pass@1) and
+    spreads signal evenly, so easy prompts (CLAUDE/CHATGPT) dominate and the hard class
+    (GEMINI) is under-weighted exactly when it most needs reinforcement. MaxRL's on-policy
+    estimator averages the score functions of the SUCCESSFUL rollouts only; in zero-mean
+    control-variate form its effective per-rollout advantage is
+
+        A_i  ∝  (r_i - r_hat) / r_hat,     r_hat = K / N   (K = #successes, N = group size)
+
+    so a success on a prompt the model rarely solves (small r_hat) is up-weighted strongly,
+    while near-solved prompts (r_hat → 1) get little extra push. This provably approximates
+    maximum-likelihood training (an infinite harmonic mixture of pass@k gradients, not just
+    pass@1), improves pass@k, and preserves output diversity better than GRPO — i.e. it
+    pushes against marginal collapse rather than toward it.
+
+    Implementation notes:
+    - Binary reward: a rollout is a "success" iff ``reward > success_threshold``.
+    - K == 0 (no success in the group) → all-zero advantages. MaxRL, like every outcome-based
+      method, provides no gradient on a prompt the model never solves; the curriculum is what
+      supplies the first GEMINI successes that this estimator then amplifies.
+    - The form is zero-mean within the group (a valid baseline). ``adv_clip`` caps the
+      magnitude on ultra-hard prompts (r_hat = 1/N gives a raw success advantage of N-1) to
+      keep the update inside a sane range; it is symmetric so it barely perturbs the baseline.
+    - Scale is O(1) (the proportional ``(r_i - r_hat)/r_hat`` form), matching the default GRPO
+      advantage so the existing LR / trust region transfer without retuning.
+    """
+    rewards = [float(r["reward"]) for r in inputs.rollouts]
+    n = len(rewards)
+    if n == 0:
+        return AdvantageOutputs(advantages=[])
+    k = sum(1 for r in rewards if r > success_threshold)
+    if k == 0:
+        return AdvantageOutputs(advantages=[0.0] * n)
+    r_hat = k / n
+    advantages = []
+    for r in rewards:
+        a = (r - r_hat) / (r_hat + eps)
+        a = max(-adv_clip, min(adv_clip, a))
+        advantages.append(a)
+    # Re-center after clipping so the group stays zero-mean (a valid baseline). Clipping the
+    # raw (r - r_hat)/r_hat on ultra-hard prompts (e.g. n=12,k=1: [+11 -> +6, -1, ...]) would
+    # otherwise leave a net-negative group sum, biasing the update against the very rare-success
+    # groups we want to amplify. Re-centering restores the clean control-variate form.
+    mean_a = sum(advantages) / n
+    advantages = [a - mean_a for a in advantages]
+    return AdvantageOutputs(advantages=advantages)
+
+
+def truncation_penalty_advantage(
+    inputs: AdvantageInputs,
+    *,
+    truncation_penalty: float = 0.5,
+) -> AdvantageOutputs:
+    """Default Dr.GRPO advantage PLUS a mild, additive penalty on TRUNCATED rollouts.
+
+    Why (anti-runaway, deliverable-safe): truncation here is a genuine pathology — a degenerate
+    repetition loop that burns the whole completion budget WITHOUT emitting ``<answer>`` (reward
+    0). The entropy recipe already drives truncation 38%->~2.5%, but the few remaining runaway
+    rollouts still waste decode and risk re-seeding the loop. This adds a small NEGATIVE advantage
+    to exactly those rollouts so the policy is pushed off the runaway trajectory.
+
+    Crucially this is NOT a general length/overlong penalty (which would push the model toward
+    ever-shorter outputs and accelerate the empty-``<reason_why>`` reward hack). It fires ONLY on
+    ``is_truncated`` rollouts. The brevity-vs-substance balance is owned by the reason-gated reward,
+    not by this term.
+
+    Implementation (rubber-duck-reviewed): start from the standard zero-mean GRPO advantage
+    ``r - r.mean()``, then ADD ``-truncation_penalty`` to truncated rollouts WITHOUT re-centering.
+    Not re-centering is deliberate: re-centering would raise every other rollout's advantage by a
+    positive constant, leaking POSITIVE advantage onto short-but-wrong rollouts (reinforcing quick
+    wrong/invalid answers as an escape from the loop). With the additive form, in an all-wrong group
+    (base advantages all 0) only the truncated rollouts go negative and every other rollout stays at
+    0 — so no incorrect rollout is ever positively reinforced, and zero-advantage filtering of fully
+    non-truncated all-wrong groups is preserved.
+    """
+    rewards = torch.tensor([float(r["reward"]) for r in inputs.rollouts], dtype=torch.float32)
+    base = rewards - rewards.mean()
+    penalties = torch.tensor(
+        [-truncation_penalty if bool(r.get("is_truncated", False)) else 0.0 for r in inputs.rollouts],
+        dtype=torch.float32,
+    )
+    return AdvantageOutputs(advantages=(base + penalties).tolist())
+
+
 def setup_advantage_fn(config: AdvantageConfig) -> AdvantageFn:
     """Setup advantage function from config."""
     if isinstance(config, CustomAdvantageConfig):

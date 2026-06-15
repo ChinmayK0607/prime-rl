@@ -1,0 +1,21 @@
+[project]
+name = "blog-author-id"
+version = "0.1.0"
+tags = ["classification", "single-turn", "xml", "forensics"]
+license = "Apache-2.0"
+description = "Detect whether a blog post was written by Claude or ChatGPT; binary exact-match reward on the parsed answer label."
+dependencies = [
+    "verifiers",
+    "datasets",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["blog_author_id.py"]
+
+[tool.verifiers.eval]
+num_examples = 10
+rollouts_per_example = 4

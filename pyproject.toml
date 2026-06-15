@@ -66,6 +66,7 @@ envs = [
     "aime2024",
     "aime2025",
     "alphabet-sort",
+    "blog-author-id",
     "code-env",
     "color-codeword",
     "deepdive",
@@ -204,6 +205,7 @@ prime-pydantic-config = { path = "deps/pydantic-config", editable = true }
 aime2024 = { path = "deps/research-environments/environments/aime2024", editable = true }
 aime2025 = { path = "deps/research-environments/environments/aime2025", editable = true }
 alphabet-sort = { path = "deps/verifiers/environments/alphabet_sort", editable = true }
+blog-author-id = { path = "deps/research-environments/environments/blog_author_id", editable = true }
 code-env = { path = "deps/research-environments/environments/code_env", editable = true }
 color-codeword = { path = "deps/research-environments/environments/color_codeword", editable = true }
 deepdive = { path = "deps/research-environments/environments/deepdive", editable = true }

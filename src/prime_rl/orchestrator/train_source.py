@@ -5,6 +5,7 @@ per-env dataset size. ``next_example`` reshuffles on cursor exhaustion."""
 
 from __future__ import annotations
 
+import os
 import random
 
 from prime_rl.orchestrator.envs import TrainEnvs
@@ -14,10 +15,15 @@ class TrainSource:
     """``next_example(available_permits)`` picks a weighted-RR env and
     returns its next example (or ``None`` when the env's per-call permit
     cost doesn't fit — the dispatch loop retries when permits free up).
-    Returned dicts carry ``env_name`` + ``example_id``."""
+    Returned dicts carry ``env_name`` + ``example_id``.
+
+    Set ``PRIME_RL_PRESERVE_DATA_ORDER=1`` to consume each env's dataset in its
+    on-disk order (no shuffle, no per-epoch reshuffle). Used for curriculum
+    runs where the dataset is pre-sorted easy->hard. Affects training only."""
 
     def __init__(self, train_envs: TrainEnvs, *, seed: int | None) -> None:
         self.rng = random.Random(seed)
+        self.preserve_order = os.environ.get("PRIME_RL_PRESERVE_DATA_ORDER") == "1"
         self.envs = list(train_envs)
         if not self.envs:
             raise ValueError("TrainSource needs at least one train env")
@@ -29,11 +35,14 @@ class TrainSource:
         self.env_costs: dict[str, int] = {}
         for env in self.envs:
             rows: list[dict] = []
-            for row in env.get_dataset(seed=seed):
+            # ``get_dataset`` (verifiers) shuffles when a seed is passed; pass
+            # None in preserve-order mode so the on-disk curriculum is kept.
+            for row in env.get_dataset(seed=None if self.preserve_order else seed):
                 ex = dict(row)
                 ex["env_name"] = env.name
                 rows.append(ex)
-            self.rng.shuffle(rows)
+            if not self.preserve_order:
+                self.rng.shuffle(rows)
             self.examples[env.name] = rows
             self.cursors[env.name] = 0
             self.env_costs[env.name] = env.config.group_size if env.requires_group_scoring else 1
@@ -52,7 +61,8 @@ class TrainSource:
         rows = self.examples[env_name]
         cursor = self.cursors[env_name]
         if cursor >= len(rows):
-            self.rng.shuffle(rows)
+            if not self.preserve_order:
+                self.rng.shuffle(rows)
             cursor = 0
         example = rows[cursor]
         self.cursors[env_name] = cursor + 1

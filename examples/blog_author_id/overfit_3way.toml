@@ -1,0 +1,81 @@
+# Overfit sanity check: can the full RL loop (rollout -> reward -> trainer ->
+# weight broadcast -> improved reward) drive reward to ~1.0 on a SINGLE prompt?
+# Uses one mixed-difficulty train example (baseline 2/4 correct) so there is
+# within-group reward variance to produce a non-zero GRPO advantage at step 0.
+
+max_steps = 15
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 6
+num_infer_gpus = 2
+
+[inference.parallel]
+tp = 2
+
+[inference.model]
+max_model_len = 16384
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+[orchestrator]
+batch_size = 32  # 4 prompts x group_size 8 -> overfit a tiny set
+group_size = 8
+
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+# Don't enforce the zero-advantage filter: once the single prompt is solved
+# (all 8 rollouts correct), advantage is 0 and the batch would otherwise be
+# dropped, leaving the trainer with no data. Here we just let it no-op.
+[[orchestrator.post_batch_filters]]
+type = "gibberish"
+enforce = false
+
+[[orchestrator.post_batch_filters]]
+type = "repetition"
+enforce = false
+
+[[orchestrator.post_batch_filters]]
+type = "zero_advantage"
+enforce = false
+
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-overfit"
+args = { split = "train", data_dir = "data/blog_author_id_3way_overfit", label_scheme = "provider3" }
+
+[orchestrator.eval]
+interval = 1
+group_size = 8
+
+[orchestrator.eval.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-overfit-eval"
+args = { split = "val", data_dir = "data/blog_author_id_3way_overfit", label_scheme = "provider3" }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-overfit-3way-sanity"

@@ -1,0 +1,67 @@
+{
+  "citation": "",
+  "description": "",
+  "features": {
+    "prompt": {
+      "feature": {
+        "role": {
+          "dtype": "string",
+          "_type": "Value"
+        },
+        "content": {
+          "dtype": "string",
+          "_type": "Value"
+        }
+      },
+      "_type": "List"
+    },
+    "answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "info": {
+      "category": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "topic": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "source_model": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "length": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "task_type": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "nc": {
+        "dtype": "int64",
+        "_type": "Value"
+      },
+      "stripped": {
+        "dtype": "bool",
+        "_type": "Value"
+      },
+      "pair_kind": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "a_gold": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "b_gold": {
+        "dtype": "string",
+        "_type": "Value"
+      }
+    }
+  },
+  "homepage": "",
+  "license": ""
+}

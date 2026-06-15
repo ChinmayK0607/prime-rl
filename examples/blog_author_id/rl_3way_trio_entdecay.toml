@@ -1,0 +1,172 @@
+# GRPO RL on the 3-way provider task (CLAUDE / CHATGPT / GEMINI) — Qwen3.5-9B, thinking
+# OFF. Single 8x H100 node: 4 GPUs train (FSDP, HF impl) + 4 GPUs inference (vLLM tp=2
+# => auto dp=2, two replicas), inference-bound so 4 infer GPUs ~2x rollout throughput.
+#
+# RUN 15E (TRIO + ENTROPY-DECAY, the combined recipe). Runs 15A and 15B found two ORTHOGONAL
+# improvements over Run 14: (15B) triowise data raises the PEAK (gated val 0.408 @ s16, the best of
+# any run, via structural pressure on the global marginal) but, with the UNDECAYED entropy bonus,
+# still collapses late (s36 trunc ->24%); (15A) decaying the entropy bonus (hold 0.02 thru s16 ->
+# anneal to 0 by s32) ELIMINATES that late collapse (s40 trunc 2.7%, no repetition loop). The two
+# levers are independent (peak vs late-stability), so this run combines them: trio data
+# (data/blog_author_id_trio, per-slot-accuracy reward) + surprisal_entropy_decay_loss_fn. Expected:
+# the 0.408-class peak of 15B, held stable to the end like 15A. Everything else identical to 15B.
+# (Trio reward = FRACTION of slots correct, reason-gated; per-slot keeps groups MIXED so a
+# restoring gradient flows even on the under-predicted class, and stays non-hackable since its only
+# within-group variance axis is partial correctness. 6 single 3-way + 6 trio rows/step.)
+#
+# RUN 7 (pairwise). Data: data/blog_author_id_trio/{train,val}. Run 6 added a single
+# CLAUDE-vs-CHATGPT contrastive pair and CURED that boundary's collapse (CHATGPT recall stayed
+# 0.86-0.94; val 0.245->0.324) — but the collapse ROTATED: GEMINI then collapsed (recall
+# 0.39->0.00, predG->0.01 by step 27) as the global 3-way prior oscillated CLAUDE-heavy then
+# CHATGPT-heavy. Root cause: one contrastive pair only protects the ONE boundary it covers;
+# GEMINI was unprotected and the global 3-way prior is still unconstrained (prime-rl's loss
+# has no reference-policy KL and no entropy bonus, so nothing anchors the prior).
+# Fix (rubber-duck-recommended SYMMETRIC coverage): interleave a contrastive pair for EVERY
+# boundary and raise the contrastive fraction to ~50%. Each step = 6 single 3-way rows (strict
+# 2/2/2, trainable-middle, difficulty/length/strip matched) + 6 pair rows (2x CLAUDE-vs-CHATGPT
+# + 2x CLAUDE-vs-GEMINI + 2x CHATGPT-vs-GEMINI, random A/B, label space restricted to the two
+# providers). A different-author pair is always exactly 50% wrong for any constant/position
+# prior -> the group stays MIXED -> survives the zero-advantage filter -> a restoring gradient
+# flows on THAT boundary every step. Covering all three boundaries protects all three classes
+# symmetrically so NO class can be abandoned. Reward unchanged (plain binary, 1.0 iff BOTH
+# slots correct -> non-hackable, no shaped escape). Per-step label exposure balanced 6/6/6.
+# Honored only with PRIME_RL_PRESERVE_DATA_ORDER=1. JUDGE BY per-class/macro recall, NOT
+# train reward (train reward is misleading here — it rises while a class is abandoned).
+#
+# Budget: batch 144 / group 12 = 12 prompts/step. 336 train rows = 28 steps (one pass).
+#
+# Sequence budget: longest 3-way prompt ~11.7k tok; pair prompt ~2 texts x 14k chars
+# (~7k tok). seq_len 16384 with completion 4096 fits both (15.8k / ~11k < 16384).
+#
+# Budget: batch 144 / group 12 = 12 prompts/step. 336 train rows = 28 steps (one pass).
+#
+# Sequence budget: longest 3-way prompt ~11.7k tok; pair prompt ~2 texts x 14k chars
+# (~7k tok). seq_len 16384 with completion 4096 fits both (15.8k / ~11k < 16384).
+
+max_steps = 40
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+[inference.model]
+max_model_len = 16384
+# Disable the qwen3 reasoning parser (auto-selected for Qwen3.5). With it ON, vLLM
+# strips the model's output into a "reasoning" channel and returns EMPTY content
+# whenever the model emits a <think> block (the thinking-leak), which (a) makes the
+# verifiers reward see an empty completion -> reward 0 (this silently zeroed every
+# contrastive PAIR reward) and (b) raises EmptyModelResponseError on long val blogs.
+# Thinking is OFF and our deliverable is plain <reason_why>/<answer> text, so we want
+# the FULL generation in `content`. pydantic-config maps the string "None" -> None,
+# which prime-rl forwards as "drop --reasoning-parser" so vLLM leaves output intact.
+reasoning_parser = "None"
+
+# Dense Qwen3.5 (hybrid linear attention) uses the HF implementation. The HF path
+# is unoptimized, so at seq_len 16k we cut activation + LM-head memory:
+#   - full activation checkpointing
+#   - chunked fused LM head (avoids a 16k x 150k-vocab logits tensor)
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6  # was 1.5e-6; Run 5 drifted into a CHATGPT-abandonment collapse. Lower LR
+           # slows the drift away from the better-balanced base while the contrastive
+           # pair task supplies the restoring gradient on the CLAUDE/CHATGPT boundary.
+
+# RUN 8 (entropy): default DPPO+KL loss PLUS a detached-surprisal entropy-bonus
+# policy-gradient term. prime-rl's GRPO loss has NO reference-policy KL and NO entropy
+# term, so the single-text class MARGINAL is unconstrained and the favored class drifts
+# (rotated C5:CHATGPT -> R6:GEMINI -> R7:CHATGPT-under-predicted). This folds per-token
+# surprisal under the rollout policy (s_t = -inference_logprob, detached, >=0) into the
+# advantage: shaped_adv = adv_tau*adv + entropy_coef*s_t, applied on keep_mask (respects
+# the DPPO trust region). It REWARDS raising the probability of rare tokens (incl. the
+# answer-label token of an under-predicted class) -> keeps that class sampled & receiving
+# corrective gradient -> anchors the marginal. Fused-LM-head compatible (sampled-token
+# logprobs only; no entropy backward, no teacher model). entropy_coef=0 == default loss.
+# SAME pairwise data as Run 7 to isolate the entropy variable.
+[trainer.loss]
+type = "custom"
+import_path = "prime_rl.trainer.rl.loss.surprisal_entropy_decay_loss_fn"
+kwargs = { entropy_coef = 0.02, hold_frac = 0.4, end_frac = 0.8, floor = 0.0, adv_tau = 1.0, kl_tau = 1e-3, dppo_mask_low = 0.2, dppo_mask_high = 0.2 }
+
+[orchestrator]
+batch_size = 144
+group_size = 12  # 12 prompts/step (9 three-way + 3 pair). Bumped 8->12 so hard-class
+                 # (CHATGPT) groups stay MIXED (>=1 correct) longer at low recall ->
+                 # survive the zero-advantage filter -> corrective gradient keeps flowing.
+
+[orchestrator.advantage]
+# Run 14: default Dr.GRPO zero-mean advantage PLUS a mild additive penalty on TRUNCATED rollouts
+# only (the genuine runaway-loop pathology). Non-recentered so it never leaks positive advantage
+# onto short-but-wrong rollouts and all-wrong groups stay zero-advantage-filtered. This is NOT a
+# general overlong/brevity penalty (that would accelerate the empty-<reason_why> hack); the
+# brevity-vs-substance tradeoff is owned by the reason-gated reward, not by this term.
+type = "custom"
+import_path = "prime_rl.orchestrator.advantage.truncation_penalty_advantage"
+kwargs = { truncation_penalty = 0.5 }
+
+# Qwen3.5 renderer with thinking disabled (matches the offline pass@4 baseline).
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_trio", label_scheme = "provider3", require_reason = true, min_reason_words = 12 }
+
+# Validation: in-distribution topic-holdout set. Sampled at temperature 0.7 (top_p
+# 0.95), NOT greedy: greedy (temp 0) decoding on long blogs falls into a degenerate
+# reasoning-repetition loop that burns the whole 4096-token budget WITHOUT emitting
+# <answer> -> truncated, reward 0 (hit long GEMINI blogs hardest, 56-78% truncation,
+# structurally suppressing GEMINI recall). Temp 0.7 breaks the loop (val truncation
+# 78%->~10%, confirmed in Run 11). group_size 2 averages two samples per example.
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 4096
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_trio", label_scheme = "provider3", require_reason = true, min_reason_words = 12 }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-grpo-3way-trio-entdecay"
+
+# Checkpointing tuned for disk: the full optimizer/DCP checkpoint is ~102 GB per
+# step and overflowed the volume on the previous run. We therefore save
+# WEIGHTS ONLY (HF safetensors, ~17 GB, no optimizer/scheduler) and align the
+# ckpt interval to the eval interval (4) so every saved checkpoint is also
+# validated — required for the best-val janitor to map a reward to a weights dir.
+# keep_last/keep_interval are intentionally unset: retention is owned by the
+# external best-val janitor (scripts/ckpt_janitor.sh), which keeps only the
+# best-val checkpoint (plus any not-yet-evaluated/in-progress ones) and prunes
+# the rest, including leaked interval-pinned weight-broadcast dirs.
+[ckpt]
+interval = 4
+
+[trainer.ckpt]
+weights_only = true

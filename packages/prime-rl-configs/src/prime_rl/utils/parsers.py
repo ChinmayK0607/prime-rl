@@ -25,7 +25,14 @@ REASONING_PARSER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^stepfun-ai/Step-3\.5"), "step3p5"),
     # Only Qwen3 Thinking models reason — Instruct/base models do not.
     (re.compile(r"^Qwen/Qwen3-.*Thinking"), "deepseek_r1"),
-    (re.compile(r"^Qwen/Qwen3\.5-"), "qwen3"),
+    # NOTE: Qwen3.5 intentionally has NO reasoning parser here. We run Qwen3.5 with
+    # thinking OFF; the qwen3 reasoning parser strips the model's output into a
+    # "reasoning" channel and returns EMPTY `content` whenever the model emits a
+    # <think> block, which makes verifiers score an empty completion (reward 0 —
+    # this silently zeroed every contrastive PAIR reward) and raises
+    # EmptyModelResponseError on long val blogs. Leaving it unset keeps the full
+    # generation in `content` so <reason_why>/<answer> is always parseable.
+    # (re.compile(r"^Qwen/Qwen3\.5-"), "qwen3"),
 ]
 
 

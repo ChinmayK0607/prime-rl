@@ -484,6 +484,8 @@ def train(config: TrainerConfig):
                 loss_fns=loss_fns,
                 loss_scale=loss_scale,
                 training_mode=micro_batch["training_mode"],
+                step=progress.step,
+                max_steps=config.max_steps,
             )
 
             # Backward pass

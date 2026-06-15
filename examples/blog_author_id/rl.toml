@@ -1,0 +1,87 @@
+# GRPO RL on the blog author-detection task — Qwen3.5-9B, thinking OFF.
+# Single 8x H100 node: 6 GPUs train (FSDP) + 2 GPUs inference (vLLM, tp=2).
+#
+# Data: data/blog_author_id_v2/{train,val} (expanded corpus, 180 train / 90 val).
+# Val = the 3 hardest categories (history, politics, economics-systems) held out
+# *entirely* — a tough, unseen-domain generalization test so val gains reflect
+# real learning.
+#
+# ~1 epoch over 180 train prompts: batch_size 96 / group_size 8 = 12 prompts
+# per step x max_steps 15 = 180 prompt rollouts. Val (90 held-out examples) is
+# evaluated at step 0 (val@0) and every 2 steps.
+
+max_steps = 15
+seq_len = 16384  # max blog prompt is ~5.5k tokens; leaves room for 8k completion
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 6
+num_infer_gpus = 2
+
+[inference.parallel]
+tp = 2
+
+[inference.model]
+max_model_len = 16384
+
+# Dense Qwen3.5 (hybrid linear attention) isn't in the custom trainer registry,
+# so use the HF implementation (transformers Qwen3_5ForCausalLM). The HF path is
+# unoptimized, so at seq_len 16k we must cut activation + LM-head memory:
+#   - full activation checkpointing (recompute instead of storing activations)
+#   - chunked fused LM head (avoids a 16k x 150k-vocab logits tensor)
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+[orchestrator]
+batch_size = 96
+group_size = 8
+
+# Qwen3.5 renderer with thinking disabled (matches the offline pass@4 baseline).
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 8192
+
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_v2" }
+
+# Validation: all 90 held-out examples (num_examples defaults to -1), pass@4 at
+# temp 1.0 (parity with training), evaluated at step 0 (val@0) and every 2 steps.
+# Mean accuracy over 90x4=360 rollouts -> sampling noise ~+/-0.026. (A temp-0
+# greedy eval was tried but is much slower: greedy decoding loops on these long
+# blogs and fills the 8k budget, so we keep the fast temp-1 eval as the signal.)
+[orchestrator.eval]
+interval = 2
+group_size = 4
+
+# Eval sampling mirrors train sampling exactly for parity between the two.
+[orchestrator.eval.sampling]
+temperature = 1.0
+max_completion_tokens = 8192
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_v2" }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-grpo-thinkoff"
+
+[ckpt] # checkpoint at the end of training
