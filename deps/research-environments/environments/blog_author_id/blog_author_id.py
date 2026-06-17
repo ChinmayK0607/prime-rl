@@ -418,12 +418,41 @@ def _data_dir() -> Path:
     return Path(__file__).resolve().parents[4] / "data" / "blog_author_id"
 
 
+# Per-provider style tells DERIVED FROM THE v2 TRAIN SPLIT ONLY (scripts/derive_train_cheatsheet.py;
+# content-free function-word / punctuation / formatting features ranked by in-class rate x lift over
+# the other two providers, no val/val_ood involvement -> zero eval leakage). Injected into the RL
+# system prompt (cheatsheet=True) to lift the base policy out of feature-blindness (the diagnosed
+# ~0.40 ceiling): base+cheatsheet jumps to ~0.67 with no training, giving GRPO real reward variance
+# and a high, non-collapsed floor to improve from.
+CHEATSHEET_TRAIN = """
+
+## KNOWN STYLE TELLS (derived from TRAINING data only; use as priors, still judge each text holistically)
+- CLAUDE — conversational & sincere: sincerity adverbs "genuinely" (~7.6x lift), "precisely", "honestly"; "the honest truth", "worth"; heavy second-person "you" and first-person "I"; essayistic, argument-driven, warm voice.
+- CHATGPT — hedging & enumerative: "can also" (~12x), "not only ... but", "for example", "depends on", "such as", "may/may be"; qualifies its claims; numbered/bulleted structure; even, cautious, balanced register.
+- GEMINI — grandiose & formal with notation: ASCII/box-drawing diagrams (>100x), "we must", "paradigm", intensifiers ("highly", "massive"), "profound"/"fundamental(ly)"; numbered sections; confident declarative register; math/technical framing."""
+
+
+def _inject_cheatsheet_into_messages(messages: list, cheat: str) -> list:
+    """Append the cheatsheet to the (first) system message of a per-row chat prompt."""
+    out = []
+    appended = False
+    for m in messages:
+        role = _msg_field(m, "role")
+        content = _msg_field(m, "content", "")
+        if role == "system" and not appended:
+            content = (content or "") + cheat
+            appended = True
+        out.append({"role": role, "content": content})
+    return out
+
+
 def load_environment(
     split: str = "train",
     data_dir: str | None = None,
     label_scheme: str = "binary",
     require_reason: bool = False,
     min_reason_words: int = 12,
+    cheatsheet: bool = False,
 ) -> vf.Environment:
     if label_scheme not in ("binary", "provider3"):
         raise ValueError(f"unknown label_scheme {label_scheme!r}")
@@ -445,6 +474,14 @@ def load_environment(
         default_system_prompt = SYSTEM_PROMPT
 
     system_prompt = None if has_prompt else default_system_prompt
+
+    if cheatsheet:
+        if has_prompt:
+            dataset = dataset.map(
+                lambda r: {"prompt": _inject_cheatsheet_into_messages(r["prompt"], CHEATSHEET_TRAIN)}
+            )
+        else:
+            system_prompt = (system_prompt or "") + CHEATSHEET_TRAIN
 
     parser = vf.Parser(extract_fn=extract_fn)
 

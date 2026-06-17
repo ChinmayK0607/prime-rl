@@ -1,0 +1,48 @@
+# SFT warmup for the 3-way provider-classification task (thinking OFF).
+# Distills gold-label-conditioned teacher rationales (base + cheatsheet, told the
+# answer) onto the PLAIN prompt, plus 210 real past-correct rollouts. Balanced
+# 894/class + rollouts = 2892 samples. Goal: internalize the style tells so the
+# model needs no cheatsheet at inference, and rescue the weak CHATGPT class.
+# Launch: uv run sft @ examples/blog_author_id/sft_warmup.toml
+output_dir = "outputs/sft_warmup"
+max_steps = 270
+clean_output_dir = true
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+attn = "flash_attention_2"
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[model.ac]  # full activation checkpointing
+mode = "full"
+
+# Qwen3.5 renderer with thinking disabled (matches eval + RL parity).
+[renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[data]
+type = "sft"
+name = "data/blog_sft_teacher_trunc"
+seq_len = 4096
+batch_size = 16
+micro_batch_size = 1
+pack_function = "stack"  # pad each sample to seq_len; no cross-sample attention bleed
+shuffle = true
+
+[optim]
+lr = 1e-5
+weight_decay = 0.01
+
+[scheduler]
+type = "cosine"
+warmup_steps = 20
+
+[ckpt]
+interval = 90
+weights_only = true
+
+[deployment]
+type = "single_node"
+num_gpus = 8

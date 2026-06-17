@@ -1,0 +1,37 @@
+# Overfit sanity check: train on 18 samples, loss should collapse toward ~0.
+output_dir = "outputs/sft_overfit"
+max_steps = 60
+clean_output_dir = true
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+attn = "flash_attention_2"
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[model.ac]
+mode = "full"
+
+[renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[data]
+type = "sft"
+name = "data/blog_sft_teacher_trunc_of"
+seq_len = 4096
+batch_size = 8
+micro_batch_size = 1
+pack_function = "stack"
+shuffle = true
+
+[optim]
+lr = 2e-5
+weight_decay = 0.0
+
+[scheduler]
+type = "constant"
+
+[deployment]
+type = "single_node"
+num_gpus = 8

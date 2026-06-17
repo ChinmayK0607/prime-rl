@@ -1,0 +1,108 @@
+{
+  "CLAUDE": [
+    [
+      "genuinely",
+      0.85,
+      7.6
+    ],
+    [
+      "the honest truth",
+      0.753,
+      6.6
+    ],
+    [
+      "worth",
+      0.804,
+      4.79
+    ],
+    [
+      "precisely",
+      0.965,
+      3.08
+    ],
+    [
+      "second-person you",
+      0.947,
+      1.87
+    ],
+    [
+      "honestly",
+      0.198,
+      4.26
+    ]
+  ],
+  "CHATGPT": [
+    [
+      "can also",
+      0.682,
+      12.45
+    ],
+    [
+      "not only..but",
+      0.894,
+      4.55
+    ],
+    [
+      "depends on",
+      0.869,
+      2.58
+    ],
+    [
+      "for example",
+      0.374,
+      5.91
+    ],
+    [
+      "such as",
+      0.923,
+      1.76
+    ],
+    [
+      "may /may be",
+      0.998,
+      1.48
+    ]
+  ],
+  "GEMINI": [
+    [
+      "ASCII diagram |/_",
+      0.4,
+      178.92
+    ],
+    [
+      "we must",
+      0.851,
+      5.7
+    ],
+    [
+      "paradigm",
+      0.71,
+      5.43
+    ],
+    [
+      "intensifier highly/massive",
+      0.982,
+      2.68
+    ],
+    [
+      "profound/fundamental",
+      0.997,
+      1.73
+    ],
+    [
+      "numbered list",
+      0.889,
+      1.56
+    ],
+    [
+      "such as",
+      0.793,
+      1.35
+    ],
+    [
+      "however",
+      0.408,
+      1.9
+    ]
+  ]
+}

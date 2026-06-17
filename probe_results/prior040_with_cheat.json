@@ -1,0 +1,49 @@
+{
+  "model": "outputs/rl_3way_trio_entdecay/weights/step_40",
+  "tag": "prior040_WITH_cheat",
+  "cheatsheet": true,
+  "results": [
+    {
+      "split": "val",
+      "n": 414,
+      "acc": 0.3237,
+      "macro_recall": 0.3237,
+      "none": 43,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 0.022,
+          "pred_share": 0.014
+        },
+        "CHATGPT": {
+          "recall": 0.022,
+          "pred_share": 0.007
+        },
+        "GEMINI": {
+          "recall": 0.928,
+          "pred_share": 0.874
+        }
+      }
+    },
+    {
+      "split": "val_ood",
+      "n": 471,
+      "acc": 0.3036,
+      "macro_recall": 0.3036,
+      "none": 83,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 0.013,
+          "pred_share": 0.006
+        },
+        "CHATGPT": {
+          "recall": 0.0,
+          "pred_share": 0.006
+        },
+        "GEMINI": {
+          "recall": 0.898,
+          "pred_share": 0.811
+        }
+      }
+    }
+  ]
+}

@@ -202,4 +202,4 @@ debug_I2_zero_band
 
 outputs/
 
-third_party/
+third_party/**/cache-*.arrow

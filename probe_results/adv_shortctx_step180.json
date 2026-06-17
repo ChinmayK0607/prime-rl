@@ -1,0 +1,74 @@
+{
+  "120": {
+    "acc": 0.673,
+    "macro": 0.673,
+    "none": 0,
+    "trunc_at_512": 0,
+    "mean_gen_tok": 126.8,
+    "per_class": {
+      "CLAUDE": 0.223,
+      "CHATGPT": 0.847,
+      "GEMINI": 0.949
+    }
+  },
+  "200": {
+    "acc": 0.7346,
+    "macro": 0.7346,
+    "none": 0,
+    "trunc_at_512": 0,
+    "mean_gen_tok": 128.0,
+    "per_class": {
+      "CLAUDE": 0.401,
+      "CHATGPT": 0.822,
+      "GEMINI": 0.981
+    }
+  },
+  "300": {
+    "acc": 0.7601,
+    "macro": 0.7601,
+    "none": 0,
+    "trunc_at_512": 0,
+    "mean_gen_tok": 129.5,
+    "per_class": {
+      "CLAUDE": 0.529,
+      "CHATGPT": 0.771,
+      "GEMINI": 0.981
+    }
+  },
+  "500": {
+    "acc": 0.8641,
+    "macro": 0.8641,
+    "none": 0,
+    "trunc_at_512": 0,
+    "mean_gen_tok": 129.6,
+    "per_class": {
+      "CLAUDE": 0.713,
+      "CHATGPT": 0.885,
+      "GEMINI": 0.994
+    }
+  },
+  "800": {
+    "acc": 0.9278,
+    "macro": 0.9278,
+    "none": 0,
+    "trunc_at_512": 0,
+    "mean_gen_tok": 129.8,
+    "per_class": {
+      "CLAUDE": 0.885,
+      "CHATGPT": 0.898,
+      "GEMINI": 1.0
+    }
+  },
+  "1500": {
+    "acc": 0.9809,
+    "macro": 0.9809,
+    "none": 0,
+    "trunc_at_512": 0,
+    "mean_gen_tok": 132.9,
+    "per_class": {
+      "CLAUDE": 0.962,
+      "CHATGPT": 0.981,
+      "GEMINI": 1.0
+    }
+  }
+}

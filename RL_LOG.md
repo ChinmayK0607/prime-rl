@@ -832,3 +832,37 @@ AT-SCALE SEPARABILITY (LogReg train->held-out, bigger + more diverse than before
    "GEMINI style doesn't transfer across register" hypothesis from runs 12-13: at the linear level it
    transfers at 100%. The entire gap to the RL'd 9B's 0.40 is MODEL-SIDE EXPLOITATION. More data is
    confirmed NOT the lever; the data is now abundant + clean for an SFT-warmup approach.
+
+=== SFT WARMUP (Design A) — SOLVED ===
+Qwen3.5-9B, impl=hf, thinking OFF, body<=3000tok/seq4096, 270 steps, lr1e-5 cosine.
+Plain-prompt eval (no cheatsheet), val + val_ood (cross-register):
+  base 0.454/0.410 -> cheatsheet 0.674/0.592 -> SFT step90 0.906/0.909
+  -> SFT step180 1.000/1.000 -> step270 1.000/1.000 (all classes recall 1.0).
+GEMINI is last class learned (0.73 @ step90 -> 1.0 @ step180); CHATGPT 0.19->1.0.
+No leakage (prefix+substring checked). Genuine grounded style reasoning emitted.
+Best artifact: outputs/sft_warmup/weights/step_180. RL-polish dropped (no headroom).
+
+=== FINAL RL RUN (Design B) — cheatsheet-elicited GRPO, no judge ===
+qwen3.5-9b-grpo-3way-trio-cheatsheet | trio data | entropy-decay loss + trunc-penalty adv |
+init BASE | train-ONLY style cheatsheet injected into train+eval system prompt | 40 steps, lr1e-6, seq16384.
+Purpose: give feature-blind base a non-collapsed reward floor so GRPO has real variance.
+Gated val reward curve (reason-gated + truncation-penalized):
+  step0 0.443 -> 12 0.517 -> 16 0.614 -> 20 0.632 -> 24 0.634 -> 28 0.662(PEAK) -> 32 0.649 -> 40 0.627
+  eval truncation collapsed 24.1% -> ~0% (model learned to be decisive, stop runaway gen).
+  Trainable groups 100% throughout (healthy variance, no class collapse).
+Best ckpt = step_28. Raw accuracy (temp0.7, plain reward off):
+  WITH cheatsheet:    val 0.659 / val_ood 0.650  (balanced; GEMINI strongest, CHATGPT weakest)
+  WITHOUT cheatsheet: val 0.348 / val_ood 0.378  => NOT internalized; collapses to ~base.
+Honest read: RL did NOT create internalized discrimination. It polished USE of the elicited
+  features: killed truncation, reliably passed the reason-gate, and improved OOD robustness
+  (val_ood 0.592->0.650 vs base+cheatsheet). Raw val acc ~flat vs base+cheatsheet (0.674->0.659).
+  => Confirms thesis: cheatsheet ELICITS, RL POLISHES format/robustness, only SFT INTERNALIZES (1.000).
+Kept ckpts: outputs/rl_3way_trio_cheat/weights/step_{28,40}. wandb run 6bac14a7. STOP (one run, per user).
+
+=== PROBE: prior 0.40 RL ckpt + cheatsheet @ eval (answers "could old run just use cheatsheet?") ===
+outputs/rl_3way_trio_entdecay/step_40 (trained NO cheatsheet), eval WITH cheatsheet:
+  val 0.324 / val_ood 0.304  -- WORSE than untrained base+cheatsheet (0.674/0.592).
+  COLLAPSED: predicts GEMINI ~87% (CLAUDE/CHATGPT recall ~0-2%), NONE 10-18% (ignores cheatsheet).
+=> The "0.40 plateau" was actually single-class COLLAPSE. Cheatsheet cannot rescue post-hoc;
+   must be present DURING training (gives GRPO non-degenerate floor, 100% trainable groups).
+   probe_results/prior040_with_cheat.json

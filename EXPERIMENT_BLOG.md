@@ -807,3 +807,227 @@ was about the RL'd model failing to read a signal that is, in information terms,
 So the data chapter of this project is closed. The corpus is large, balanced, clean, and — provably
 — saturated with separable signal. Everything that follows is about **getting that signal into the
 model**, which is where the next experiments are aimed.
+
+---
+
+# Part VII — Exploitation experiments: the model *can* read the tells, it just won't on its own
+
+The separability work (Parts V–VI) proved the signal is there and trivially linearly readable.
+This part attacks the real bottleneck: **getting a 9B model to actually use it.** Three probes, no
+training yet, on the v2 split (val: 414, held-out topics; val_ood: 471, entirely held-out
+categories).
+
+## The three no-training probes
+
+| Condition | val acc | val_ood acc |
+|---|---|---|
+| Baseline (plain prompt) | 0.454 | 0.410 |
+| **+ Cheatsheet (style tells in system prompt)** | **0.674** | **0.592** |
+| Few-shot (3 truncated exemplars) | 0.321 (collapsed) | — |
+
+Per-class recall, val cheatsheet: CLAUDE 0.877, CHATGPT 0.333, GEMINI 0.812.
+
+Three things to sit with:
+
+1. **The base model already beats every RL run.** Plain Qwen3.5-9B scores 0.454 on val — higher
+   than the best RL checkpoint's 0.40. The RL runs were not just plateauing; relative to the base
+   model they were *net-negative*. Whatever GRPO was optimizing, it was eroding the model's prior
+   ability to read style.
+
+2. **Handing the model the tells is worth +0.22 (val) / +0.18 (val_ood), with zero training.**
+   The cheatsheet is nothing but the empirically-derived per-provider style tells (the same features
+   the logreg uses) written into the system prompt. The model clearly *can* apply them — it just
+   does not surface them unprompted. This is the cleanest possible confirmation that the ceiling is
+   **attention/elicitation, not capability and not data.** And it transfers cross-register
+   (val_ood 0.41→0.59), exactly as the separability analysis predicted.
+
+3. **CHATGPT is the universal hard class** (recall 0.19 base → 0.33 cheatsheet, lowest everywhere).
+   The model systematically under-predicts CHATGPT (its hedging/enumerative register is the easiest
+   for a human to name but the model's weakest prior). Any training fix has to target this class
+   specifically.
+
+4. **Few-shot backfired.** Three truncated exemplars collapsed the model onto GEMINI (pred_share
+   0.89). Truncation + in-context exemplars is the wrong lever here; discarded.
+
+## Where this points
+
+The cheatsheet *is already a deployable 0.67 system.* The remaining questions are whether we can (a)
+internalize the tells so no cheatsheet is needed at inference, (b) beat 0.67, and (c) specifically
+rescue CHATGPT. That is the SFT-warmup experiment (Design A), now running: a **gold-label-conditioned
+teacher** (base + cheatsheet, told the answer) writes a short, grounded rationale for every train
+blog; we distill those onto the *plain* prompt with the canonical gold answer. Using the teacher to
+*explain* (not to *decide*) keeps all three classes fully and equally covered — avoiding the
+rejection-sampling bias that would have starved the already-weak CHATGPT class.
+
+## VII.b — SFT warmup result: the tells *do* internalize, and the task collapses to solved
+
+The Design A SFT warmup ran (Qwen3.5-9B, `impl="hf"`, thinking OFF, 270 steps, ckpt @
+90/180/270, body truncated ≤3000 tok / seq_len 4096 to dodge the `fla` gated-delta-rule
+CUDA grid-Z>65535 crash; loss 1.38→~0.35). We then evaluated **each checkpoint on the
+*plain* prompt — no cheatsheet, no few-shot — on both val and the cross-register val_ood.**
+
+| checkpoint | val acc | val_ood acc | CHATGPT recall | GEMINI recall |
+|---|---|---|---|---|
+| base (no train)      | 0.454 | 0.410 | 0.19 | 0.57 |
+| base + cheatsheet    | 0.674 | 0.592 | 0.33 | 0.81 |
+| **SFT step 90**      | 0.906 | 0.909 | 0.98 / 1.00 | 0.74 / 0.73 |
+| **SFT step 180**     | **1.000** | **1.000** | 1.00 | 1.00 |
+| **SFT step 270**     | **1.000** | **1.000** | 1.00 | 1.00 |
+
+Per-class recall and prediction share are all exactly balanced (0.333 each) at convergence —
+zero errors across all 414 val + 471 val_ood examples, **including the out-of-distribution
+register split.**
+
+Why we trust a perfect score (it is not a leak or a parsing artifact):
+- **No leakage.** SFT teacher data was generated over v2-*train* blogs only; an explicit
+  prefix (first 400 alnum chars) *and* 300-char substring check against val/val_ood found
+  **zero** overlapping blogs.
+- **Believable learning curve.** step_90 is at 0.91 with GEMINI as the lone laggard (recall
+  0.73); GEMINI is fully learned only by step_180. A monotone, class-by-class curve is what
+  real feature acquisition looks like, not the step-function you would see from memorization.
+- **Stochastic robustness.** Eval sampling is temp 0.7 / top_p 0.95 — yet every single one of
+  885 samples is correct. A spurious match would leak errors under sampling noise.
+- **The reasoning is genuine and grounded.** The model now *articulates the tells on its own*:
+  Claude → sincere essayistic adverbs ("genuinely," "honestly"), warm first person; ChatGPT →
+  enumerative structure, hedging, equations-in-prose; Gemini → grandiose intensifiers
+  ("profound," "fundamentally"), declarative register, ASCII/LaTeX. These are exactly the
+  empirically-derived fingerprints from Parts V–VI — now produced from the *plain* prompt with
+  no cheatsheet present.
+
+**This closes the thesis.** Parts V–VI proved the data is ~100% separable and the 0.40 RL
+ceiling was model feature-blindness, not data. A short SFT warmup that simply *shows the model
+how to read its own features* lifts plain-prompt accuracy 0.454 → 1.000 and rescues the
+historically hopeless CHATGPT class (0.19 → 1.00). RL was never the missing piece; elicitation
+was. The cheatsheet got us a training-free 0.67; SFT internalizes the same knowledge to a
+perfect, cheatsheet-free, OOD-robust classifier that explains itself.
+
+**Implications for next steps.** With val and val_ood both saturated, RL-polish (the planned
+Design A→RL arm) has no headroom to chase and is dropped. The only remaining open ablation is
+Design C (thinking-ON) — purely to see whether an explicit reasoning budget changes the
+*articulation*, not the accuracy. Best deployable artifact: `outputs/sft_warmup/weights/step_180`
+(earliest perfect checkpoint).
+
+---
+
+## Part VIII — The final RL run (Design B): cheatsheet-elicited GRPO
+
+One last plain-RL run (no LLM judge), built to test a sharp question: *if we lift the
+feature-blind base policy out of its blind spot with a train-derived style cheatsheet, can
+GRPO then improve on top of it?* The cheatsheet (CLAUDE sincerity adverbs, CHATGPT
+hedging/enumeration, GEMINI ASCII-diagram + grandiosity) was derived from **training data
+only** — no val/test leakage — and injected into both the train and eval system prompts.
+Init from BASE, trio data, entropy-decay loss + truncation-penalty advantage, 40 steps.
+
+**Why this design.** From the base policy, GRPO has zero gradient on saturated full-text
+accuracy and collapses from the ~0.40 feature-blind floor. The cheatsheet raises the floor to
+a non-degenerate ~0.44 *gated* reward with **100% trainable (mixed-reward) groups** — exactly
+the variance GRPO needs.
+
+**What happened.** Gated val reward climbed smoothly 0.443 → **0.662** (peak @ step 28), and
+eval truncation collapsed 24% → ~0%. A clean, healthy RL curve with no class collapse.
+
+| step | 0 | 12 | 16 | 20 | 24 | **28** | 32 | 40 |
+|---|---|---|---|---|---|---|---|---|
+| gated val reward | .443 | .517 | .614 | .632 | .634 | **.662** | .649 | .627 |
+| eval truncation | 24% | 19% | 5.5% | 4.7% | 0.5% | 0.2% | 1.7% | 1.7% |
+
+**But did it learn the features?** Evaluating the best checkpoint (step 28) two ways:
+
+| step_28 regime | val | val_ood |
+|---|---|---|
+| WITH cheatsheet (trained regime) | 0.659 | 0.650 |
+| WITHOUT cheatsheet (internalization check) | **0.348** | **0.378** |
+| base+cheatsheet, no RL (prior probe) | 0.674 | 0.592 |
+
+**The honest conclusion.** Remove the cheatsheet and the RL'd model falls straight back to
+base-level feature-blindness (~0.36). So **RL did not internalize the discrimination ability** —
+it remains entirely cheatsheet-contingent. What RL *did* accomplish is real but narrow: it
+taught the policy to **use** the elicited features reliably — eliminating truncation, passing the
+substantive-reason gate, and improving **OOD robustness** (val_ood 0.592 → 0.650). Raw val
+accuracy stayed flat versus the training-free base+cheatsheet (0.674 → 0.659).
+
+This is the cleanest possible statement of the whole project's thesis:
+- **The cheatsheet ELICITS** features (training-free, +0.18–0.22).
+- **RL POLISHES** their use (format discipline, gate-passing, OOD) but creates no new knowledge.
+- **Only SFT INTERNALIZES** them — to a perfect, cheatsheet-free, OOD-robust 1.000 (Part VII.b).
+
+Feature-blindness, not data and not RL optimization, was always the binding constraint; supervised
+elicitation is the only lever that removes it. Best deployable artifact remains
+`outputs/sft_warmup/weights/step_180`. RL artifacts kept for the colleague's four-way judge
+comparison: `outputs/rl_3way_trio_cheat/weights/step_{28,40}`.
+
+### Part VIII addendum — could the *old* 0.40 RL model just use the cheatsheet?
+
+A natural question: was the cheatsheet a prompt trick we could have bolted onto the earlier
+plain-RL run? We tested it directly — eval the prior 0.40 checkpoint
+(`rl_3way_trio_entdecay/step_40`, trained WITHOUT a cheatsheet) WITH the cheatsheet at eval time:
+
+| Model + cheatsheet @ eval | val | val_ood |
+|---|---|---|
+| base (untrained) + cheatsheet | 0.674 | 0.592 |
+| new RL (trained WITH cheatsheet) + cheatsheet | 0.659 | 0.650 |
+| prior 0.40 RL (trained WITHOUT cheatsheet) + cheatsheet | **0.324** | **0.304** |
+
+It performs **worse than the untrained base** — and reveals the truth about the "0.40 plateau":
+it was actually **collapse**. The old model predicts GEMINI ~87% of the time (CLAUDE/CHATGPT
+recall ~0–2%) and largely ignores the injected cheatsheet (NONE rate 10–18%, instruction-
+following damaged). The cheatsheet cannot rescue a collapsed policy post-hoc.
+
+**Conclusion:** the cheatsheet is not an inference-time add-on; it must be present **during
+training**. It is precisely what kept the new run from collapsing — giving GRPO a non-degenerate
+reward floor with 100% trainable (mixed-reward) groups — whereas the cheatsheet-free run collapsed
+to a single class. This is the strongest evidence that the historical ~0.40 RL ceiling was a
+training-dynamics collapse under feature-blindness, not a data or capacity limit.
+
+---
+
+## Part IX — Why the RL didn't internalize: a signal/entropy analysis
+
+Config grounding: GRPO group size G=12, Dr.GRPO mean-centered (un-normalized) advantage,
+surprisal entropy bonus beta=0.02 held through step 16 then annealed to 0 by step 32, train
+temperature 1.0, reason-gated reward (1 answer token + up to ~4096 reason tokens), lr 1e-6, 40 steps.
+
+Model: one 3-way categorical decision, correct-prob q (under temp), reward r in {0,1} = gate-passed
+correctness, effective success p=qg. Advantage A_i = r_i - rbar. Let v = q(1-q).
+
+### M1 — sparse-signal SNR ceiling
+Correct-logit score: d log pi/dz_c = 1{y=c} - q. Per-group gradient ghat = sum_i A_i (1{y_i=c}-q).
+  Signal  E[ghat] = G*Cov(r,1{y=c}) = G*p(1-q) = G*g*q(1-q)        (proportional to v -- the parabola)
+  Noise   sqrt(Var ghat) ~ sqrt(G*v)
+  => SNR ~ sqrt(G*v) <= sqrt(12 * 0.25) ~ 1.73  even in the best case (q=0.5).
+The signal is the quadratic v=q(1-q): max at 0.5, zero at the ends. Only 1 of ~4096 completion
+tokens carries correctness signal. Groups stayed 100% mixed (v near max) so saturation was avoided
+-- but the per-step SNR is barely above 1, hence slow movement.
+
+### M2 — entropy x sparseness = noise (quadratic in beta)
+The surprisal bonus beta*s_t (s_t=-log pi_t) is added to EVERY kept token, incl. ~L reason tokens
+that have near-zero task gradient. Full-sequence power:
+  SNR^2_seq = (G v)^2 / ( G v  +  beta^2 * L * sigma_s^2 )
+Entropy noise is quadratic in beta, linear in token count L. Crossover where entropy noise overtakes
+the sparse answer signal:
+  beta* ~ G v / (L * sbar) ~ (12*0.25)/(700*1.5) ~ 0.003.
+We ran beta=0.02 ~ 6*beta* for the whole hold phase (steps 0-16); the linear anneal only crosses
+below beta* near step ~30.
+DATA CONFIRMS: eval reward flat while beta high (0.443->0.517 over steps 0-12), accelerates as beta
+decays (0.614->0.662, steps 16-28), PEAKS at step 28 -- exactly as beta enters the signal-dominant
+regime. The anchor-the-marginal bonus spent the first 40% of training drowning the answer signal.
+
+### M3 — the cheatsheet is a confounder: internalization gradient ~ 0
+d E[r]/d theta_features  proportional to  I(r ; theta_features | cheatsheet) ~ 0,
+because the cheatsheet already supplies the tells in-context: conditioned on it, encoding the same
+features in weights has ~zero marginal reward value, so there is NO gradient to internalize. RL can
+only learn the cheap in-context routing (few bits). Information budget: lr 1e-6 x SNR~1.7 x 40 steps
+is enough for shallow routing, nowhere near enough to write a 3-way discriminator into 9B weights.
+=> 0.66 WITH cheatsheet, 0.35 WITHOUT. No SNR would have fixed this; it is structural.
+
+### Synthesis & prescriptions
+M1 caps signal (sqrt(G v) ~ 1.7; 1 signal token in 4096). M2 adds off-task noise ~ beta^2 L
+(we ran 6x over beta*; reward peaked as beta decayed). M3 zeroes the internalization gradient
+(confounder). Together: healthy-looking training, slow/capped gains, zero internalization.
+Fixes: (1) mask the entropy bonus to the answer token / keep beta <= beta* ~ 0.003 or decay from
+step 0; (2) raise SNR via larger G (SNR ~ sqrt G) not more steps; (3) to internalize, WITHDRAW the
+cheatsheet during training (curriculum) -- or use SFT, whose dense per-token teacher gives an
+O(sqrt L) higher gradient SNR per example than a 1-bit reward on one token. The dense-vs-sparse
+supervision gap is the whole story behind SFT=1.000 vs RL-capped-0.66.
+(Heuristic: assumes near-independent token scores, single signal token, constant gate prob; the
+skeleton is exact and beta* predicts the observed step-28 peak.)

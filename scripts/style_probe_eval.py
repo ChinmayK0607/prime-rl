@@ -87,12 +87,13 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--tp", type=int, default=4)
     ap.add_argument("--out", default="")
+    ap.add_argument("--model", default=MODEL)
     args = ap.parse_args()
 
     ds = load_from_disk(f"{DATA}/{args.split}")
     if args.limit:
         ds = ds.select(range(min(args.limit, len(ds))))
-    tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
+    tok = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
 
     sys_prompt = SYSTEM_PROMPT_3WAY + (CHEATSHEET if args.mode == "cheatsheet" else "")
     fewshot = build_fewshot(load_from_disk(f"{DATA}/train"), tok) if args.mode == "fewshot" else []
@@ -105,7 +106,7 @@ def main():
                                        enable_thinking=args.thinking)
         prompts.append(text)
 
-    llm = LLM(model=MODEL, tensor_parallel_size=args.tp, max_model_len=16384,
+    llm = LLM(model=args.model, tensor_parallel_size=args.tp, max_model_len=16384,
               gpu_memory_utilization=0.9, trust_remote_code=True, enforce_eager=False)
     sp = SamplingParams(temperature=0.7, top_p=0.95, max_tokens=4096, seed=0)
     outs = llm.generate(prompts, sp)

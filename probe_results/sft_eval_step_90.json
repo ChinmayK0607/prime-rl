@@ -1,0 +1,48 @@
+{
+  "model": "outputs/sft_warmup/weights/step_90",
+  "tag": "sft_step_90",
+  "results": [
+    {
+      "split": "val",
+      "n": 414,
+      "acc": 0.9058,
+      "macro_recall": 0.9058,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 1.0,
+          "pred_share": 0.428
+        },
+        "CHATGPT": {
+          "recall": 0.978,
+          "pred_share": 0.326
+        },
+        "GEMINI": {
+          "recall": 0.739,
+          "pred_share": 0.246
+        }
+      }
+    },
+    {
+      "split": "val_ood",
+      "n": 471,
+      "acc": 0.9087,
+      "macro_recall": 0.9087,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 1.0,
+          "pred_share": 0.423
+        },
+        "CHATGPT": {
+          "recall": 1.0,
+          "pred_share": 0.335
+        },
+        "GEMINI": {
+          "recall": 0.726,
+          "pred_share": 0.242
+        }
+      }
+    }
+  ]
+}

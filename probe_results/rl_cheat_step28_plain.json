@@ -1,0 +1,48 @@
+{
+  "model": "outputs/rl_3way_trio_cheat/weights/step_28",
+  "tag": "rl_cheat_step28_plain",
+  "results": [
+    {
+      "split": "val",
+      "n": 414,
+      "acc": 0.3478,
+      "macro_recall": 0.3478,
+      "none": 1,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 0.486,
+          "pred_share": 0.449
+        },
+        "CHATGPT": {
+          "recall": 0.297,
+          "pred_share": 0.348
+        },
+        "GEMINI": {
+          "recall": 0.261,
+          "pred_share": 0.2
+        }
+      }
+    },
+    {
+      "split": "val_ood",
+      "n": 471,
+      "acc": 0.3779,
+      "macro_recall": 0.3779,
+      "none": 1,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 0.452,
+          "pred_share": 0.41
+        },
+        "CHATGPT": {
+          "recall": 0.395,
+          "pred_share": 0.376
+        },
+        "GEMINI": {
+          "recall": 0.287,
+          "pred_share": 0.212
+        }
+      }
+    }
+  ]
+}

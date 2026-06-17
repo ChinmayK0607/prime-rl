@@ -1,0 +1,126 @@
+{
+  "model": "outputs/sft_warmup/weights/step_180",
+  "split": "val_ood",
+  "n": 471,
+  "perts": {
+    "raw": {
+      "n": 471,
+      "acc": 1.0,
+      "macro": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": 1.0,
+        "CHATGPT": 1.0,
+        "GEMINI": 1.0
+      },
+      "pred_share": {
+        "CLAUDE": 0.333,
+        "CHATGPT": 0.333,
+        "GEMINI": 0.333,
+        "NONE": 0.0
+      }
+    },
+    "strip_md": {
+      "n": 471,
+      "acc": 1.0,
+      "macro": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": 1.0,
+        "CHATGPT": 1.0,
+        "GEMINI": 1.0
+      },
+      "pred_share": {
+        "CLAUDE": 0.333,
+        "CHATGPT": 0.333,
+        "GEMINI": 0.333,
+        "NONE": 0.0
+      }
+    },
+    "norm_punct": {
+      "n": 471,
+      "acc": 1.0,
+      "macro": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": 1.0,
+        "CHATGPT": 1.0,
+        "GEMINI": 1.0
+      },
+      "pred_share": {
+        "CLAUDE": 0.333,
+        "CHATGPT": 0.333,
+        "GEMINI": 0.333,
+        "NONE": 0.0
+      }
+    },
+    "lower": {
+      "n": 471,
+      "acc": 1.0,
+      "macro": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": 1.0,
+        "CHATGPT": 1.0,
+        "GEMINI": 1.0
+      },
+      "pred_share": {
+        "CLAUDE": 0.333,
+        "CHATGPT": 0.333,
+        "GEMINI": 0.333,
+        "NONE": 0.0
+      }
+    },
+    "first800": {
+      "n": 471,
+      "acc": 0.9236,
+      "macro": 0.9236,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": 0.885,
+        "CHATGPT": 0.885,
+        "GEMINI": 1.0
+      },
+      "pred_share": {
+        "CLAUDE": 0.325,
+        "CHATGPT": 0.297,
+        "GEMINI": 0.378,
+        "NONE": 0.0
+      }
+    },
+    "sent_shuffle": {
+      "n": 471,
+      "acc": 0.9979,
+      "macro": 0.9979,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": 0.994,
+        "CHATGPT": 1.0,
+        "GEMINI": 1.0
+      },
+      "pred_share": {
+        "CLAUDE": 0.331,
+        "CHATGPT": 0.335,
+        "GEMINI": 0.333,
+        "NONE": 0.0
+      }
+    },
+    "hard": {
+      "n": 471,
+      "acc": 0.9958,
+      "macro": 0.9958,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": 0.987,
+        "CHATGPT": 1.0,
+        "GEMINI": 1.0
+      },
+      "pred_share": {
+        "CLAUDE": 0.329,
+        "CHATGPT": 0.338,
+        "GEMINI": 0.333,
+        "NONE": 0.0
+      }
+    }
+  }
+}

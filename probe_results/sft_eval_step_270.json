@@ -1,0 +1,48 @@
+{
+  "model": "outputs/sft_warmup/weights/step_270",
+  "tag": "sft_step_270",
+  "results": [
+    {
+      "split": "val",
+      "n": 414,
+      "acc": 1.0,
+      "macro_recall": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "CHATGPT": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "GEMINI": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        }
+      }
+    },
+    {
+      "split": "val_ood",
+      "n": 471,
+      "acc": 1.0,
+      "macro_recall": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "CHATGPT": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "GEMINI": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        }
+      }
+    }
+  ]
+}
