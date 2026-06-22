@@ -1241,3 +1241,14 @@ loss-MASKING run (keep <reason_why> in the sequence but mask its loss, supervise
 span) to disambiguate "noisy-rationale-supervision" from "reasoning-format/length conditioning."
 LADDER STATUS: E0 done (forgetting yardstick), E1 done (+ decisive answer-only control). E2-E4
 intentionally not run on the saturated eval; deferred to the harder eval.
+
+---
+
+## Model artifacts on the Hub (public, CK0607)
+All checkpoints pushed to https://huggingface.co/CK0607and removed locally (disk cleanup):
+- qwen3.5-9b-blogprovider-sft-goldcond — gold-conditioned SFT, val/ood 1.000
+- qwen3.5-9b-blogprovider-selfgated-answeronly — answer-only on self-gated rows, 1.000 (headline)
+- qwen3.5-9b-blogprovider-star-selfdistill — STaR self-distillation, 0.932/0.953
+- qwen3.5-9b-blogprovider-rl-cheatsheet — best GRPO RL (cheatsheet), ~0.40 cheatsheet-free
+- qwen3.5-9b-blogprovider-rl-entropydecay — entropy-decay ablation (negative)
+- qwen3.5-9b-blogprovider-rl-pureacc-peak — pure-accuracy RL peak (0.66) before collapse
