@@ -1,0 +1,117 @@
+# PURE-ACCURACY / NO-REASONING diagnostic (Part IX test). Strips <reason_why>: the
+# completion collapses to a single <answer>LABEL</answer> (L~1), which zeroes the
+# entropy-noise term (~beta^2*L, M2) and un-dilutes the sparse-signal SNR (M1: the
+# answer token IS the only token). Init from BASE, no cheatsheet -> tests whether
+# removing reason-token dilution alone lets GRPO climb the ~0.40 feature-blind ceiling
+# on cheatsheet-free accuracy. Uniform single-3way data (v2), balanced 894/class,
+# zero train/val(_ood) leakage (exact/prefix/substr = 0). Measurement run, not deliverable.
+
+max_steps = 60
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+# Port 8000 is occupied on this box by an unrelated long-running service; move the
+# vLLM server + DP rpc to free ports (client base_url below must match server.port).
+[inference.server]
+port = 8200
+
+[inference.deployment]
+backend_port = 8300
+
+[inference.deployment.router]
+port = 8200
+
+[inference.model]
+max_model_len = 16384
+reasoning_parser = "None"
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+# Surprisal entropy-decay loss: with L~1 the bonus acts almost entirely on the single
+# answer/label token, where exploration is exactly what anchors the class marginal and
+# prevents the historical single-class collapse. beta^2*L is negligible here.
+[trainer.loss]
+type = "custom"
+import_path = "prime_rl.trainer.rl.loss.surprisal_entropy_decay_loss_fn"
+kwargs = { entropy_coef = 0.02, hold_frac = 0.4, end_frac = 0.8, floor = 0.0, adv_tau = 1.0, kl_tau = 1e-3, dppo_mask_low = 0.2, dppo_mask_high = 0.2 }
+
+[orchestrator]
+batch_size = 144
+group_size = 12
+
+[orchestrator.student.client]
+base_url = ["http://localhost:8200/v1"]
+
+[orchestrator.advantage]
+type = "custom"
+import_path = "prime_rl.orchestrator.advantage.truncation_penalty_advantage"
+kwargs = { truncation_penalty = 0.5 }
+
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 32
+
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = false, cheatsheet = false, answer_only = true }
+
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 32
+# Eval goes through the chat-completions client (not the renderer/token path), so the
+# renderer's enable_thinking=false is NOT applied. Disable thinking here via vLLM's
+# chat_template_kwargs so eval matches train (direct <answer>, no <think> preamble);
+# otherwise the model reasons and truncates at 32 tokens (reward ~0).
+extra_body = { chat_template_kwargs = { enable_thinking = false } }
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = false, cheatsheet = false, answer_only = true }
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val-ood"
+args = { split = "val_ood", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = false, cheatsheet = false, answer_only = true }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-grpo-3way-pure-acc-noreason"
+
+[ckpt]
+interval = 20
+keep_last = 1
+
+[trainer.ckpt]
+weights_only = true
+interval = 20
+keep_last = 1

@@ -1,0 +1,49 @@
+{
+  "model": "outputs/sft_star_e1_ans/weights/step_200",
+  "tag": "star_e1_ans_step200",
+  "cheatsheet": false,
+  "results": [
+    {
+      "split": "val",
+      "n": 414,
+      "acc": 1.0,
+      "macro_recall": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "CHATGPT": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "GEMINI": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        }
+      }
+    },
+    {
+      "split": "val_ood",
+      "n": 471,
+      "acc": 1.0,
+      "macro_recall": 1.0,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "CHATGPT": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        },
+        "GEMINI": {
+          "recall": 1.0,
+          "pred_share": 0.333
+        }
+      }
+    }
+  ]
+}

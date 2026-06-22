@@ -1,0 +1,49 @@
+{
+  "model": "outputs/sft_star_e1/weights/step_80",
+  "tag": "star_e1_step80",
+  "cheatsheet": false,
+  "results": [
+    {
+      "split": "val",
+      "n": 414,
+      "acc": 0.9324,
+      "macro_recall": 0.9324,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 1.0,
+          "pred_share": 0.399
+        },
+        "CHATGPT": {
+          "recall": 0.797,
+          "pred_share": 0.266
+        },
+        "GEMINI": {
+          "recall": 1.0,
+          "pred_share": 0.336
+        }
+      }
+    },
+    {
+      "split": "val_ood",
+      "n": 471,
+      "acc": 0.9533,
+      "macro_recall": 0.9533,
+      "none": 0,
+      "per_class": {
+        "CLAUDE": {
+          "recall": 0.994,
+          "pred_share": 0.372
+        },
+        "CHATGPT": {
+          "recall": 0.885,
+          "pred_share": 0.299
+        },
+        "GEMINI": {
+          "recall": 0.981,
+          "pred_share": 0.329
+        }
+      }
+    }
+  ]
+}

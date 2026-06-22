@@ -1,0 +1,74 @@
+{
+  "base": {
+    "perplexity": 2.7785976668322303,
+    "generations": [
+      {
+        "cat": "math",
+        "prompt": "What is 47 times 23? Show your work briefly.",
+        "output": "To calculate $47 \\times 23$, we can use the standard multiplication method:\n\n1.  Multiply 47 by the ones digit of 23 (which is 3):\n    $$47 \\times 3 = 141$$\n\n2.  Multiply 47 by the tens digit of 23 (which is 20):\n    $$47 \\times 20 = 940$$\n\n3.  Add the two results together:\n    $$141 + 940 = 1081$$\n\n**Answer:**"
+      },
+      {
+        "cat": "math",
+        "prompt": "If a train travels 60 miles in 1.5 hours, what is its average speed in miles per hour?",
+        "output": "To find the average speed, we use the formula:\n\n$$ \\text{Average Speed} = \\frac{\\text{Total Distance}}{\\text{Total Time}} $$\n\n**Step 1: Identify the given values.**\n*   Total Distance = $60$ miles\n*   Total Time = $1.5$ hours\n\n**Step 2: Substitute the values into the formula.**\n$$ \\text{Average Speed} = \\frac{60}{1.5} $$\n\n**Step 3: Perform the division.**\nTo make the division easier, you can multiply both the numerator and the denominator"
+      },
+      {
+        "cat": "factual",
+        "prompt": "Name the capital of Australia and one fact about it.",
+        "output": "The capital of Australia is **Canberra**.\n\nOne notable fact about it is that it was not the largest city in the country when it was chosen; instead, it was selected as a compromise between the two rival cities of **Sydney** and **Melbourne** to serve as the nation's capital. It was officially established in 1913 and is located in the Australian Capital Territory (ACT), which is surrounded by the state of New South Wales."
+      },
+      {
+        "cat": "factual",
+        "prompt": "Who wrote the play 'Hamlet' and roughly when?",
+        "output": "The play **'Hamlet'** was written by **William Shakespeare**.\n\nWhile the exact date of composition is debated by scholars, it is generally believed to have been written between **1599 and 1601**. This places the play in Shakespeare's so-called \"Second Period\" or early \"Mature Period,\" a time when he began to experiment with more complex psychological characters and darker themes.\n\nThe play was first published in a quarto edition in **1603**, though this version contains significant errors and omissions compared to the more reliable \"Second Quarto\" published in **1604** and the \""
+      },
+      {
+        "cat": "reasoning",
+        "prompt": "A farmer has 17 sheep. All but 9 run away. How many are left? Explain.",
+        "output": "### Step-by-Step Deduction\n\n1.  **Analyze the phrase \"All but 9\"**:\n    *   The phrase \"all but\" means \"everything except.\"\n    *   Therefore, \"all but 9\" implies that every sheep ran away *except* for 9 of them.\n\n2.  **Identify the remaining group**:\n    *   If 9 sheep did not run away, those are the ones that stayed behind.\n    *   The total number of sheep (17) is irrelevant to the count of the sheep that remained, because the problem explicitly states how many"
+      },
+      {
+        "cat": "code",
+        "prompt": "Write a one-line Python expression that returns the sum of squares from 1 to n.",
+        "output": "`sum(i**2 for i in range(1, n+1))`"
+      }
+    ]
+  },
+  "sft_step180": {
+    "perplexity": 2.8663671274488083,
+    "generations": [
+      {
+        "cat": "math",
+        "prompt": "What is 47 times 23? Show your work briefly.",
+        "output": "To calculate $47 \\times 23$, we can use the standard multiplication algorithm:\n\n1.  Multiply 47 by 3:\n    $47 \\times 3 = 141$\n\n2.  Multiply 47 by 20 (which is 2 in the tens place):\n    $47 \\times 20 = 940$\n\n3.  Add the two results together:\n    $141 + 940 = 1081$\n\n**Answer:** 1081"
+      },
+      {
+        "cat": "math",
+        "prompt": "If a train travels 60 miles in 1.5 hours, what is its average speed in miles per hour?",
+        "output": "To find the average speed, you divide the total distance traveled by the total time taken.\n\n**Step 1: Identify the given values**\n*   Distance = 60 miles\n*   Time = 1.5 hours\n\n**Step 2: Apply the formula**\n$$ \\text{Average Speed} = \\frac{\\text{Distance}}{\\text{Time}} $$\n\n**Step 3: Calculate**\n$$ \\text{Average Speed} = \\frac{60}{1.5} $$\n\nTo make the division easier, you can multiply both the numerator and the denominator by 10"
+      },
+      {
+        "cat": "factual",
+        "prompt": "Name the capital of Australia and one fact about it.",
+        "output": "The capital of Australia is **Canberra**.\n\nOne fact about it is that it was specifically designed and built as a compromise between the two largest cities, Sydney and Melbourne, to serve as the nation's capital. It is also known for its distinct \"bush\" landscape and the presence of the iconic Parliament House."
+      },
+      {
+        "cat": "factual",
+        "prompt": "Who wrote the play 'Hamlet' and roughly when?",
+        "output": "The play *Hamlet* was written by **William Shakespeare**. It is generally dated to around **1600\u20131601**, with the first quarto printed in 1603."
+      },
+      {
+        "cat": "reasoning",
+        "prompt": "A farmer has 17 sheep. All but 9 run away. How many are left? Explain.",
+        "output": "The farmer has **9** sheep left.\n\nHere is the explanation:\nThe phrase \"all but 9\" means that every sheep except for 9 ran away. Therefore, the number of sheep remaining is exactly the number specified in the phrase, which is 9.\n\nYou can also calculate it mathematically:\n*   Total sheep: 17\n*   Sheep that ran away: $17 - 9 = 8$\n*   Sheep left: $17 - 8 = 9$"
+      },
+      {
+        "cat": "code",
+        "prompt": "Write a one-line Python expression that returns the sum of squares from 1 to n.",
+        "output": "`sum(i**2 for i in range(1, n+1))`"
+      }
+    ]
+  },
+  "n_ppl_texts": 154,
+  "ppl_delta_pct": 3.1587682399748243
+}

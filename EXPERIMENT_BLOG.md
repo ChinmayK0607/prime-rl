@@ -1031,3 +1031,213 @@ O(sqrt L) higher gradient SNR per example than a 1-bit reward on one token. The 
 supervision gap is the whole story behind SFT=1.000 vs RL-capped-0.66.
 (Heuristic: assumes near-independent token scores, single signal token, constant gate prob; the
 skeleton is exact and beta* predicts the observed step-28 peak.)
+
+## Part X — The pure-accuracy / no-reasoning RL test (M2, isolated)
+
+Part IX prescription #1 was: remove the reason tokens so the entropy/noise term beta^2*L
+collapses (L: ~700 -> ~9) and the sparse answer-token signal is no longer diluted. Part X runs
+exactly that experiment as a clean diagnostic.
+
+Setup (zero-leakage, tight): init from BASE (no cheatsheet), v2 uniform single-3way data
+(balanced 894/class train; val 276/class; val_ood ~314/class; exact/prefix/substr leakage = 0),
+answer_only prompt (completion = a single `<answer>LABEL</answer>`, decode_len mean 9.6 tokens),
+require_reason=false, max_completion_tokens=32, G=12, batch 144, lr 1e-6, train temp 1.0 / eval
+temp 0.7, surprisal_entropy_decay beta=0.02 (hold_frac 0.4, end_frac 0.8), truncation_penalty adv,
+evals on val+val_ood every 4 steps. (Infra notes: eval goes through the chat-completions client, so
+enable_thinking=false must be set via eval extra_body chat_template_kwargs or eval truncates 100%;
+run must be HF-offline to avoid a hub file-list hang; filesystem weight-broadcast + unpruned ckpts
+fill disk -- use keep_last and nccl/keep_last.)
+
+### Result -- cheatsheet-free eval accuracy (the number prior reasoning+cheatsheet RL capped at ~0.40)
+  step0  val 0.348 / ood 0.375   (= chance, 0.333)
+  step4  val 0.383 / ood 0.404
+  step8  val 0.384 / ood 0.414   (CLAUDE already nearly dropped: predicted 3/828)
+  step12 val 0.580 / ood 0.572   (CLAUDE fully dropped: 0 predictions)
+  step16 val 0.650 / ood 0.662   (PEAK)
+  step~20 ABORT: RuntimeError "10 consecutive zero-trainable batches" (prime-rl guardrail).
+
+### What actually happened -- the confusion matrix (step16, temp 0.7)
+  blog-val            pred:CLAUDE CHATGPT GEMINI   recall
+    gold CLAUDE            0      270       6       0.000
+    gold CHATGPT           0      267       9       0.967
+    gold GEMINI            0        5     271       0.982
+  blog-val-ood
+    gold CLAUDE            0      313       1       0.000
+    gold CHATGPT           0      314       0       1.000
+    gold GEMINI            0        4     310       0.987
+
+The policy learned a NEAR-PERFECT CHATGPT-vs-GEMINI discriminator (recall 0.97-1.00 each) and
+absorbed ALL of CLAUDE into CHATGPT (CLAUDE recall exactly 0.000). The 0.65-0.66 "peak" IS the
+2-class ceiling (2/3 = 0.667). Once the policy is deterministic, every GRPO group is uniform-reward
+(CLAUDE groups all-wrong -> A=0; CHATGPT/GEMINI groups all-right -> A=0) -> zero gradient -> abort.
+Note the collapse happened DURING the entropy hold phase (beta at full 0.02): the single-token
+surprisal bonus was too weak to keep CLAUDE sampled once the reward gradient sharpened the policy.
+
+### Reading (calibrated -- what this does and does NOT show)
+DOES show: removing reason-token dilution lets answer-only GRPO extract real discriminative signal
+and clear the prior ~0.40 cheatsheet-free ceiling -- it learned a strong 2-way (CHATGPT/GEMINI)
+classifier from a 1-bit reward. That is genuine learning, not a degenerate fluke (0.97+ recall on two
+classes cannot come from class-dropping alone). Directionally consistent with M1/M2: concentrating the
+sparse signal on the single answer token (zeroing beta^2*L) unblocked optimization that the long-L
+reasoning runs could not achieve.
+Does NOT show: that M1/M2 was THE cause of the prior 0.40 ceiling (setups differ: prior =
+cheatsheet-trained reasoning policy measured cheatsheet-free; this = from-scratch answer-only). And
+it did NOT reach a stable 3-way solution -- it collapsed to an absorbing 2-class optimum. The 0.66 is
+a transient peak of a degenerate policy, not a reportable 3-way accuracy.
+New finding: CLAUDE collapses into CHATGPT (not GEMINI) -- the CLAUDE/CHATGPT style boundary is the
+fine one; GEMINI is the easy split. Under sparse single-token RL the policy carves the easy boundary
+and abandons the hard one, because GRPO has no within-group reward variance to recover a class it has
+stopped sampling. (Consistent with the earlier SFT observation that CHATGPT/CLAUDE were the close,
+last-learned classes; SFT's dense per-token teacher resolves the fine boundary, sparse RL cannot.)
+
+### Open controls (cheap, decisive -- next, if pursued)
+  1. Label-rotation control: rerun with neutral/rotated labels (A/B/C). If the SAME provider (CLAUDE)
+     collapses -> content/feature-driven; if the collapse follows the label token -> tokenization/prior
+     bias. (Labels tokenize 3-each with distinct first tokens CL / CHAT / G -- no shared-prefix clash,
+     so a pure-tokenization artifact is unlikely but untested.)
+  2. Binary CLAUDE-vs-rest answer-only GRPO: if it learns -> the 3-way failure is exploration/collapse;
+     if it cannot -> residual CLAUDE feature-blindness under sparse RL.
+  3. Anti-collapse 3-way (only if 1-2 implicate exploration): larger G (more within-group variance) +
+     higher train temp (keep CLAUDE sampled) + lower lr (5e-7, slower sharpening) + entropy floor +
+     early-stop if CLAUDE pred-rate -> 0. NOT a blunt global-entropy bump (won't help post-collapse).
+
+### Part X addendum — base-prior control refutes the label-token-bias hypothesis (free)
+Concern (rubber-duck): maybe CLAUDE collapses because its label token has a low prior, not because
+its blogs are hard. Test, from the saved rollouts, the per-step CLAUDE prediction rate on blog-val:
+  step0(BASE) CLAUDE 522/828 = 0.63   step4 0.29   step8 0.00   step12 0.00   step16 0.00
+The BASE model OVER-predicts CLAUDE (63% -- it is the model's default/favorite class), and RL
+actively SUPPRESSES it to 0. This is the opposite of a low-prior/token-bias story. So CLAUDE is not
+hard to EMIT; the CLAUDE-vs-CHATGPT decision BOUNDARY is the hard one. Sparse single-token GRPO
+reassigns the base's lazy CLAUDE-default mass into CHATGPT (the stylistically adjacent class),
+collapsing the fine boundary into an absorbing state, while cleanly carving out the easy GEMINI
+split. Mechanism is content/boundary difficulty + exploration collapse, NOT label tokenization.
+(This makes a label-rotation rerun lower priority; the prior is already the wrong sign for token bias.)
+
+---
+
+## Part XI — OPSD ladder: internalization without gold-conditioned teaching
+
+Motivation: SFT solves the task (1.000) but the teacher is GOLD-CONDITIONED — it is *told* the
+answer (ANALYST NOTE) and writes a rationale to justify it. The OPSD ladder asks a sharper
+question: can the model internalize the provider tells from its OWN reasoning, where the gold
+label is NEVER shown during generation and is used only as a binary verifier to gate which
+self-generated trajectories become training data? (Framing per rubber-duck: this is "no
+per-example gold shown during rationale generation", not "zero leakage" globally — gold still
+selects the kept set, and the kept completions contain the correct label.)
+
+### E0 — forgetting / capability baseline (the yardstick) — DONE
+Question: how much did the SFT-to-1.000 damage general capability? A method that internalizes
+the tells WITHOUT this cost is strictly better.
+Eval (scripts/eval_e0_forgetting.py, BASE vs sft_warmup/step_180, HF teacher-forcing):
+  - General-text perplexity (4 generic paragraphs + 150 gsm8k test items):
+    BASE 2.779  ->  SFT 2.866   (+3.2%)  ==> negligible forgetting.
+  - 6 capability probes (arithmetic, rate, factual x2, trick-reasoning, one-line code):
+    all intact and correct on the SFT model (e.g. 47x23 worked, "all but 9"->9, sum-of-squares
+    one-liner identical to base).
+Verdict: the gold-conditioned SFT internalized the tells at essentially ZERO general-capability
+cost. This is the bar E1-E4 must match or beat.
+
+### E1 — STaR self-distillation (on-policy, verifier-gated) — IN PROGRESS
+Pipeline (scripts/gen_star_e1.py, single round):
+  1. PLAIN pass: BASE + plain prompt (no cheatsheet), thinking-off, k=3 @ temp0.7 on all 2682
+     train. Gate: majority-vote==gold AND >=2/3 correct.
+  2. HINT pass on the still-wrong: BASE + train-derived CHEATSHEET (general rules, NOT the gold
+     answer), k=2. Gate: >=1/2 correct; reject rationales that explicitly cite the cheatsheet/
+     hint/rules (must justify from observable text only).
+  3. SFT target = PLAIN prompt + blog -> the model's OWN <reason_why>+<answer> (gold canonical).
+Yield: 1913/2682 accepted (71%).  Accepted by (gold, source):
+     CLAUDE  plain=162 hint=518 total=680
+     CHATGPT plain=297 hint= 60 total=357   <- bottleneck (base's hard class; cheatsheet barely
+     GEMINI  plain=363 hint=513 total=876       helps CHATGPT, +60 only)
+Class-balanced to cap=357/class = 1071 SFT rows (avoids amplifying the base's class skew, per
+rubber-duck). Note the asymmetry: the cheatsheet rescues CLAUDE massively (+518) and GEMINI
+(+513) but barely moves CHATGPT (+60) — consistent with CHATGPT being the stylistically "average"
+class that the surface-tell rules under-serve.
+SFT config: examples/blog_author_id/sft_star_e1.toml (BASE init, seq4096, body<=3000tok, lr1e-5,
+max 200 steps ~3 epochs, ckpt every 40). Eval: plain prompt val/val_ood per ckpt. [result pending]
+
+#### E1 RESULT — self-distilled reasoning reaches 0.93/0.95 without gold-conditioned teaching
+Eval = PLAIN prompt (no cheatsheet), val + val_ood, temp0.7 top_p0.95, thinking-off, NONE=0 everywhere.
+| ckpt | val acc | val_ood acc | CLAUDE r | CHATGPT r | GEMINI r (val) |
+|------|---------|-------------|----------|-----------|----------------|
+| step40  | 0.577 | 0.533 | 0.587 | 0.681 | 0.464 |
+| step80  | **0.932** | **0.953** | 1.000 | 0.797 | 1.000 |  <- BEST
+| step120 | 0.891 | 0.879 | 0.964 | 0.877 | 0.833 |
+| step160 | 0.928 | 0.909 | 1.000 | 0.819 | 0.964 |
+| step200 | 0.896 | 0.883 | 1.000 | 0.797 | 0.891 |
+
+Takeaways:
+- STaR self-distillation (gold NEVER shown during generation; only verifier-gates) reaches
+  val 0.932 / val_ood 0.953 — vs base 0.45, the RL ceiling ~0.40-0.66, and gold-conditioned SFT
+  1.000. So ~93-95% of the task is learnable from the model's OWN verifier-gated rationales.
+- val_ood >= val at the peak (0.953 > 0.932): the self-generated rationales generalize OOD, not
+  memorize. Format perfect (NONE=0). Both extreme classes hit 1.000 recall.
+- The entire residual gap to 1.000 is CHATGPT (recall 0.80-0.89, never 1.0). This traces directly
+  to the data-yield asymmetry: in generation the cheatsheet rescued CLAUDE (+518) and GEMINI (+513)
+  but barely CHATGPT (+60), so CHATGPT's 357 kept rows are almost all low-margin plain-correct
+  rationales — the weakest training signal for the hardest class.
+- INTERPRETATION (calibrated, per rubber-duck): reaching 0.93 does NOT prove the *reasoning text*
+  caused it (a clean labeled subset alone can teach a classifier). What gold-conditioned teaching
+  buys over self-distillation is concentrated exactly where self-generated reasoning is scarce
+  (CHATGPT) — i.e. the teacher's value is rescuing the class the model cannot yet articulate on its
+  own. RECOMMENDED cheap control (not yet run): SFT answer-only on the SAME 1071 gated examples; if
+  it matches ~0.93, the reasoning tokens were not the active ingredient (labeled subset sufficed);
+  if it underperforms, the self-generated rationale text carries real signal.
+- Forgetting (E0 yardstick): not separately measured for E1, but identical SFT recipe/scale =>
+  expected comparably negligible.
+Best artifact: outputs/sft_star_e1/weights/step_80. Data: data/blog_sft_star_e1_trunc (1071 rows).
+
+#### E1 CONTROL — answer-only on the SAME gated rows BEATS the reasoning run (decisive)
+The rubber-duck's causal control: SFT answer-only (strip <reason_why>, keep only <answer>LABEL)
+on the IDENTICAL 1071 verifier-gated examples. If it matches the reasoning run, the rationale
+text was not the active ingredient. Result (plain-prompt val/val_ood):
+| ckpt | val acc | val_ood acc | notes |
+|------|---------|-------------|-------|
+| ans-only step40  | 0.976 | 0.981 | CHATGPT recall already 1.000 |
+| ans-only step80  | **1.000** | **1.000** | ALL classes 1.0, pred_share 0.333 each |
+| ans-only step200 | 1.000 | 1.000 | stable perfect |
+vs reasoning-run BEST (step80): val 0.932 / val_ood 0.953.
+
+This is the sharpest result of the ladder. CALIBRATED CLAIM (per rubber-duck): the supported
+statement is narrow — "ON THIS task/data/eval, supervising SELF-GENERATED rationales hurts final
+classification vs answer-only supervision on the same selected examples." NOT "reasoning is
+inherently harmful" (gold-conditioned reasoning also hit 1.000 — the reasoning FORMAT is fine; the
+issue is self-generated rationale CONTENT as a supervision target). Statistical note: 1.000 = 0
+errors OBSERVED (val n=414, ood n=471), 95% rule-of-3 CI ~[0.991, 1.0]; the reasoning run 0.932
+(386/414) CI ~[0.908, 0.956] does NOT overlap => the gap is real, not seed noise. Findings:
+1. The self-generated reasoning was not merely unnecessary — as a supervision target it was net
+   harmful here. On identical data, answer-only 1.000 > with-reasoning 0.953. Imitating the model's
+   own (sometimes spurious) rationales injected noise / diluted the label gradient.
+2. The damage was concentrated in CHATGPT exactly as predicted: reasoning-run CHATGPT recall
+   0.80-0.89 (its kept rationales were the weakest — cheatsheet added only +60), but answer-only
+   CHATGPT recall = 1.000. Stripping the noisy rationale text un-capped the hard class.
+3. Answer-only on just 1071 SELF-gated rows MATCHES the gold-conditioned teacher SFT (1.000 on
+   2892 gold-rationale rows). => neither the gold label-conditioning NOR the rationale text was the
+   active ingredient; a small, clean, class-balanced labeled subset is sufficient and OOD-robust
+   (1.000 on val_ood = unseen topics), reconfirming Parts V-VI: providers are ~perfectly separable
+   by surface style.
+4. Re-frames the whole RL saga (Parts VIII-X): RL optimizes a SPARSE signal through the REASONING
+   channel for a task whose discriminative signal is a DENSE supervised label-mapping. The matched
+   tool is answer-only supervised learning (1.000); the mismatched tools are reasoning-RL (collapse,
+   0.40-0.66) and even reasoning-SFT (0.93, noise-capped). The pure-accuracy RL run (Part X) was
+   directionally right (answer-only > reasoning) but RL's sparsity made it collapse; answer-only
+   SFT gets the dense version of the same signal and wins cleanly.
+Artifacts: outputs/sft_star_e1_ans/weights/step_80 (1.000/1.000, 1071 self-gated rows, no reasoning).
+Caveat: "verifier-gated" still uses gold to SELECT the train subset; this is supervised learning on
+a gold-selected, label-balanced set — not unsupervised. The novelty is that the SELECTION + labels
+(not any rationale) carry all the signal.
+
+#### OPSD ladder — STOP decision (E2-E4 pre-empted)
+Decision (validated by rubber-duck): do NOT run E2 (OPCD), E3 (RLSD), E4 (ECHO) on this eval.
+Rationale: E2-E4 are all REASONING-CHANNEL distillation methods requiring heavy custom-loss
+engineering, but (a) the eval ceiling is already 1.000/1.000 via plain answer-only SFT (no
+headroom to beat), and (b) the E1 control shows the reasoning channel is not the bottleneck and
+self-rationale supervision is net-harmful here. Spending the engineering on sophisticated
+reasoning-distillation against a saturated, reasoning-adverse task is low-value.
+The genuinely open question — does sophisticated reasoning distillation help when the task is NOT
+trivially separable — belongs on the HARDER eval (collaborator is building it), where there is
+real headroom. Recommended single cheap strengthener if revisited on this eval: a rationale-token
+loss-MASKING run (keep <reason_why> in the sequence but mask its loss, supervise only the answer
+span) to disambiguate "noisy-rationale-supervision" from "reasoning-format/length conditioning."
+LADDER STATUS: E0 done (forgetting yardstick), E1 done (+ decisive answer-only control). E2-E4
+intentionally not run on the saturated eval; deferred to the harder eval.

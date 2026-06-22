@@ -866,3 +866,52 @@ outputs/rl_3way_trio_entdecay/step_40 (trained NO cheatsheet), eval WITH cheatsh
 => The "0.40 plateau" was actually single-class COLLAPSE. Cheatsheet cannot rescue post-hoc;
    must be present DURING training (gives GRPO non-degenerate floor, 100% trainable groups).
    probe_results/prior040_with_cheat.json
+
+=== PURE-ACCURACY / NO-REASONING RL (Part X) — answer-only GRPO, BASE init, no cheatsheet ===
+Config: v2 uniform data, answer_only (completion = single <answer>LABEL</answer>, decode_len~9.6),
+require_reason=false, max_completion_tokens=32, G=12, batch144, lr1e-6, temp1.0/eval0.7,
+surprisal_entropy_decay beta0.02(hold0.4/end0.8), trunc_penalty adv, eval val+ood @interval4.
+Zero leakage (exact/prefix/substr=0); balanced classes. config: examples/blog_author_id/rl_3way_v2_pure_acc.toml
+Eval (cheatsheet-FREE acc):
+  step0 val0.348/ood0.375  step4 0.383/0.404  step8 0.384/0.414
+  step12 0.580/0.572  step16 0.650/0.662 (PEAK)  step~20 ABORT (10 consecutive zero-trainable batches)
+Confusion (step16): CLAUDE recall 0.000 (270/276 -> CHATGPT), CHATGPT 0.967-1.000, GEMINI 0.982-0.987.
+=> Learned a near-perfect CHATGPT-vs-GEMINI classifier; absorbed ALL CLAUDE into CHATGPT. 0.66 = the
+   2-class ceiling (2/3). Deterministic policy -> uniform-reward groups -> zero advantage -> abort.
+   Collapse occurred during the entropy HOLD phase (beta full) -> single-token bonus too weak.
+READING: answer-only RL DOES clear the prior ~0.40 cheatsheet-free ceiling via real 2-way signal
+   extraction (directionally supports M1/M2 reason-token dilution), but does NOT reach a stable 3-way
+   solution -- collapses to an absorbing 2-class optimum (drops the hard CLAUDE/CHATGPT boundary).
+   0.66 is a transient degenerate peak, not a reportable 3-way accuracy.
+Artifact: outputs/rl_3way_pure_acc/run_default/broadcasts/step_16 (peak weights, collapsed). wandb 60d51475.
+Next controls (cheap): label-rotation (A/B/C) to separate content-vs-token bias; binary CLAUDE-vs-rest;
+   then anti-collapse 3-way (larger G + higher train temp + lower lr + entropy floor + early-stop) if warranted.
+
+================================================================================
+OPSD LADDER — E0 (forgetting baseline) + E1 (STaR self-distillation)
+================================================================================
+E0 (eval-only, scripts/eval_e0_forgetting.py): BASE vs sft_warmup/step_180.
+  General-text perplexity 2.779 -> 2.866 (+3.2%); 6/6 capability probes intact.
+  => gold-conditioned SFT-to-1.000 cost ~zero general capability. Yardstick for E1-E4.
+
+E1 (STaR on-policy self-distillation; gold NEVER shown in generation, only verifier-gates):
+  Gen (scripts/gen_star_e1.py): plain k=3 maj-gate + cheatsheet-hint k=2 gate on still-wrong,
+  reject hinted rationales citing the cheatsheet. 1913/2682 accepted; class-balanced cap=357
+  => 1071 SFT rows. Accepted-by-source asymmetry: CLAUDE plain162/hint518, GEMINI 363/513,
+  CHATGPT 297/60 (cheatsheet barely helps CHATGPT).
+  SFT (sft_star_e1.toml, BASE init, seq4096, lr1e-5, 200 steps, ckpt/40). PLAIN-prompt eval:
+    step40 0.577/0.533 -> step80 0.932/0.953 (BEST) -> step120 0.891/0.879 -> step160 0.928/0.909
+    -> step200 0.896/0.883.  CHATGPT recall caps 0.80-0.89 (residual gap source); CLAUDE+GEMINI ~1.0.
+  => self-generated verifier-gated reasoning internalizes ~93-95% of the task without any gold-
+  conditioned teacher. Gap to 1.000 is exactly the class self-reasoning can't articulate (CHATGPT).
+  Recommended cheap control (pending): answer-only SFT on same 1071 gated rows (isolates whether
+  reasoning text vs labeled subset drives the gain). Artifact: outputs/sft_star_e1/weights/step_80.
+
+E1 CONTROL (answer-only SFT on the SAME 1071 verifier-gated rows; reasoning stripped):
+  step40 0.976/0.981 -> step80 1.000/1.000 (all classes, balanced) -> step200 1.000/1.000.
+  => BEATS the reasoning run (0.932/0.953) on identical data. Self-generated rationales were
+  ACTIVELY HARMFUL (noise), worst on CHATGPT (reasoning recall 0.80-0.89 -> answer-only 1.000).
+  Answer-only on 1071 self-gated rows == gold-conditioned SFT (1.000 on 2892 gold rows): the
+  rationale text and the gold-conditioning were BOTH non-essential; a small clean class-balanced
+  labeled subset suffices and is OOD-robust. Confirms: this task's signal is a DENSE supervised
+  label-mapping; RL-through-reasoning (sparse) is the mismatched tool. Artifact step_80 (1.000/1.000).

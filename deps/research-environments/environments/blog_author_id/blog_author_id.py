@@ -82,6 +82,29 @@ Confidence: HIGH / MEDIUM / LOW
 - Do NOT output <think> or </think> tags, or any text before <reason_why>; put all of your reasoning only inside <reason_why>.
 - If signals conflict, say so briefly and reflect that in your confidence."""
 
+# Answer-only variant (NO <reason_why>): used for the pure-accuracy / no-reasoning
+# diagnostic run. Collapses the completion to a single label token so the sparse-signal
+# SNR ceiling (M1) and the entropy-noise term ~beta^2*L (M2) both shrink to ~0. The
+# deliverable articulation is intentionally dropped here; this is a measurement run.
+SYSTEM_PROMPT_3WAY_ANSWERONLY = """You are an expert forensic analyst of AI-generated text.
+
+## TASK
+You will be given a piece of text. It was written by exactly one of these three AI providers. Identify which one:
+- CLAUDE — Anthropic's Claude
+- CHATGPT — OpenAI's ChatGPT
+- GEMINI — Google's Gemini
+
+Judge only HOW the text is written, never WHAT it is about.
+
+## OUTPUT FORMAT
+Respond with ONLY this single tag and nothing else (no reasoning, no preamble, no other text):
+
+<answer>CLAUDE</answer>   (or CHATGPT, or GEMINI)
+
+## RULES
+- Always classify; choose exactly one provider.
+- Output nothing before or after the <answer> tag. Do NOT explain. Do NOT output <think>."""
+
 # Hard-pair (2-way) auxiliary task: CLAUDE vs CHATGPT only. Used as an in-curriculum
 # auxiliary stream to force the policy onto the genuinely hard CLAUDE/CHATGPT
 # boundary (the one that collapses under 3-way correctness-only reward) WITHOUT a
@@ -453,6 +476,7 @@ def load_environment(
     require_reason: bool = False,
     min_reason_words: int = 12,
     cheatsheet: bool = False,
+    answer_only: bool = False,
 ) -> vf.Environment:
     if label_scheme not in ("binary", "provider3"):
         raise ValueError(f"unknown label_scheme {label_scheme!r}")
@@ -468,12 +492,18 @@ def load_environment(
 
     if label_scheme == "provider3":
         extract_fn = _make_extractor(_LABEL_RE_3WAY)
-        default_system_prompt = SYSTEM_PROMPT_3WAY
+        default_system_prompt = SYSTEM_PROMPT_3WAY_ANSWERONLY if answer_only else SYSTEM_PROMPT_3WAY
     else:
         extract_fn = _make_extractor(_LABEL_RE)
         default_system_prompt = SYSTEM_PROMPT
 
     system_prompt = None if has_prompt else default_system_prompt
+
+    if answer_only and has_prompt:
+        raise ValueError(
+            "answer_only=True requires a dataset WITHOUT a baked per-row 'prompt' column "
+            "(e.g. blog_author_id_3way_v2); the trio/pair prompts mandate <reason_why>."
+        )
 
     if cheatsheet:
         if has_prompt:

@@ -1,0 +1,14 @@
+{
+  "n_items": 2682,
+  "n_accepted": 1913,
+  "cap": 357,
+  "by_gold_source": {
+    "CLAUDE/plain": 162,
+    "CLAUDE/hint": 518,
+    "CHATGPT/plain": 297,
+    "CHATGPT/hint": 60,
+    "GEMINI/plain": 363,
+    "GEMINI/hint": 513
+  },
+  "final_rows": 1071
+}
