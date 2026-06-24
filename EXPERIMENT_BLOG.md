@@ -34,6 +34,38 @@ Eight GRPO runs later, here's the short version:
 
 ---
 
+## TL;DR — the whole story (updated 2026-06-24)
+
+That first TL;DR was Part I (the eight-run RL era). Here is the complete arc after eleven parts:
+
+- **The task is densely separable; the base model just won't read the tells.** A tiny
+  formatting classifier hits 97.5%; the base 9B sits ~35% on the 3-way task and ~0.45 even
+  prompted plainly. Providers are perfectly separable by **content-free surface style**, and
+  that separability survives a register change (Parts V–VI).
+- **RL through the reasoning channel never internalized it.** Across ~15 GRPO runs it
+  plateaued (~0.40 cheatsheet-free), reward-hacked the class prior, and collapsed late. A
+  signal/entropy analysis (Part IX) explains why: the reward is sparse and single-token, so
+  SNR is capped and entropy × sparseness injects noise that grows **quadratically** — RL was
+  training in a too-noisy regime for a task whose signal is dense.
+- **SFT solves it outright.** Gold-conditioned teacher-rationale SFT reaches **val/ood = 1.000**
+  (Part VII.b) at **~zero capability cost** (E0: general-text perplexity +3.2%, capability
+  probes intact).
+- **The decisive experiment (Part XI).** We asked whether the model can internalize the tells
+  from its OWN reasoning, with the gold label **never shown during generation** (only used to
+  verifier-gate kept trajectories — STaR). It reaches **0.932 / 0.953**. Then the control:
+  strip the rationale and train **answer-only on the identical gated rows** → **1.000 / 1.000**.
+  So the self-generated reasoning was not just unnecessary, it was **net-harmful** here, and the
+  discriminative signal is a **dense supervised label-mapping**, OOD-robust, learnable from ~357
+  examples/class with no rationale at all.
+- **Why RL "didn't work," finally.** RL optimizes a *sparse* signal through the *reasoning*
+  channel; the matched tool for this task is plain *answer-only supervised learning* (1.000).
+  Reasoning-RL (collapse, 0.40–0.66) and even reasoning-SFT (0.93, noise-capped) are the
+  mismatched tools. The genuinely open question — does sophisticated reasoning distillation help
+  when the task is NOT trivially separable — is deferred to a harder eval (in progress).
+- **Artifacts.** Six checkpoints are public at https://huggingface.co/CK0607 (see end).
+
+---
+
 ## 1. The Question
 
 Large language models have *voices*. Read enough output and you start to feel it —
@@ -1137,7 +1169,7 @@ Eval (scripts/eval_e0_forgetting.py, BASE vs sft_warmup/step_180, HF teacher-for
 Verdict: the gold-conditioned SFT internalized the tells at essentially ZERO general-capability
 cost. This is the bar E1-E4 must match or beat.
 
-### E1 — STaR self-distillation (on-policy, verifier-gated) — IN PROGRESS
+### E1 — STaR self-distillation (on-policy, verifier-gated) — DONE
 Pipeline (scripts/gen_star_e1.py, single round):
   1. PLAIN pass: BASE + plain prompt (no cheatsheet), thinking-off, k=3 @ temp0.7 on all 2682
      train. Gate: majority-vote==gold AND >=2/3 correct.
@@ -1245,10 +1277,71 @@ intentionally not run on the saturated eval; deferred to the harder eval.
 ---
 
 ## Model artifacts on the Hub (public, CK0607)
-All checkpoints pushed to https://huggingface.co/CK0607and removed locally (disk cleanup):
-- qwen3.5-9b-blogprovider-sft-goldcond — gold-conditioned SFT, val/ood 1.000
-- qwen3.5-9b-blogprovider-selfgated-answeronly — answer-only on self-gated rows, 1.000 (headline)
-- qwen3.5-9b-blogprovider-star-selfdistill — STaR self-distillation, 0.932/0.953
-- qwen3.5-9b-blogprovider-rl-cheatsheet — best GRPO RL (cheatsheet), ~0.40 cheatsheet-free
-- qwen3.5-9b-blogprovider-rl-entropydecay — entropy-decay ablation (negative)
-- qwen3.5-9b-blogprovider-rl-pureacc-peak — pure-accuracy RL peak (0.66) before collapse
+All checkpoints pushed to https://huggingface.co/CK0607 and removed locally (disk cleanup; freed
+~134G, outputs/ 144G→104M). Each is a complete HF model dir (4 bf16 shards + config + tokenizer +
+VL preprocessor files), uploaded with a model card:
+- [qwen3.5-9b-blogprovider-sft-goldcond](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-sft-goldcond) — gold-conditioned teacher SFT, val/ood **1.000**
+- [qwen3.5-9b-blogprovider-selfgated-answeronly](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-selfgated-answeronly) — answer-only on self-gated rows, **1.000** (headline)
+- [qwen3.5-9b-blogprovider-star-selfdistill](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-star-selfdistill) — STaR self-distillation, **0.932/0.953**
+- [qwen3.5-9b-blogprovider-rl-cheatsheet](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-rl-cheatsheet) — best GRPO RL (cheatsheet), ~0.40 cheatsheet-free
+- [qwen3.5-9b-blogprovider-rl-entropydecay](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-rl-entropydecay) — entropy-decay ablation (negative)
+- [qwen3.5-9b-blogprovider-rl-pureacc-peak](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-rl-pureacc-peak) — pure-accuracy RL peak (0.66) before collapse
+
+Code (env, configs, data-gen + eval + push scripts, all docs): fork branch
+[`blog-author-id-experiments`](https://github.com/ChinmayK0607/prime-rl/tree/blog-author-id-experiments).
+
+---
+
+## Part XII — Final synthesis, reproducibility, and what's next
+
+### The one-paragraph conclusion
+For a task whose discriminative signal is **dense and content-free-stylistic** (every text carries
+the per-provider tells, and the classes are ~perfectly separable), the right tool is **plain
+answer-only supervised learning**: it hits 1.000/1.000 from ~357 examples/class, generalizes OOD,
+and costs ~zero general capability. **Reinforcement learning through a reasoning channel is the
+mismatched tool** — its single-token sparse reward caps SNR and (with entropy) injects
+quadratically-growing noise, so it plateaus, hacks the class prior, and collapses. Most strikingly,
+**supervising the model's own self-generated rationales is net-harmful** here: on identical
+verifier-gated data, with-reasoning SFT tops out at 0.93 while answer-only reaches 1.000, with the
+damage concentrated in exactly the class (CHATGPT) whose self-generated rationales were weakest. The
+"reasoning helps" intuition is task-dependent; on a saturated, densely-separable benchmark it is
+false.
+
+### Method ladder, side by side (PLAIN-prompt eval, val / val_ood)
+| Method | val | val_ood | Notes |
+|--------|-----|---------|-------|
+| Base (plain prompt) | ~0.45 | — | model won't read the tells unaided |
+| Base + cheatsheet (in-context) | ~0.67 | — | can read tells when handed them |
+| GRPO RL (reasoning + cheatsheet), best | ~0.40* | — | *cheatsheet-free; plateau + late collapse |
+| Pure-accuracy RL (answer-only), peak | 0.650 | 0.662 | transient; then collapses (2-class) |
+| STaR self-distillation (E1) | 0.932 | 0.953 | self-gen reasoning, gold only verifier-gates |
+| Gold-conditioned teacher SFT | 1.000 | 1.000 | teacher told the answer |
+| **Answer-only on self-gated rows (E1 control)** | **1.000** | **1.000** | no rationale; the matched tool |
+
+### Reproducibility / infra notes worth keeping
+- **Kernel path (SFT):** the trainer ran the **pure-PyTorch (torch) fallback**, NOT the Triton
+  `fla` fast path. Qwen3.5-9B's gated-delta-rule / short-conv layers need **both** `fla` and
+  `causal-conv1d`; `fla` + `triton` are installed but **`causal_conv1d` is not**, so transformers
+  logs "fast path is not available … Falling back to torch implementation." Effect: correct but
+  slower (~8.8k tok/s, MFU ~5.5%); as a side benefit it sidesteps the `fla` Triton grid-Z>65535
+  crash that bites the vLLM *inference* path. To enable the fast path: `pip install causal-conv1d`
+  (then keep seq_len ≤ 16384 to avoid the grid-Z limit).
+- **Thinking-off eval gotcha:** prime-rl train rollouts honor `enable_thinking=false` via the
+  renderer, but EVAL uses the chat-completions client which does NOT — set eval
+  `extra_body={chat_template_kwargs={enable_thinking=false}}` or eval truncates ~100% (reward ~0).
+- **Offline + ports:** runs need `HF_HUB_OFFLINE=1` (else vLLM's repo-file listing hangs the DP
+  coordinator) and a free port (8000 is held by an unrelated shared service; use 8200/8300).
+- **Zero-leakage discipline:** the cheatsheet is derived from the TRAIN split only; gold labels are
+  used only to verifier-gate the self-distillation set; val/val_ood (held-out topics) are never
+  touched. The 1.000 on val_ood (OOD topics) is the cleanest evidence this is generalization, not
+  leakage.
+
+### What's next (deferred by design)
+The OPSD ladder's E2 (OPCD), E3 (RLSD), E4 (ECHO) are reasoning-channel distillation methods that
+need heavy custom losses. They are **pre-empted on this saturated eval** (no headroom past 1.000;
+reasoning is net-harmful here) and deferred to a **harder eval** (collaborator building it) where
+there is real headroom and the reasoning-vs-answer-only question can actually be decided. The one
+cheap strengthener if revisited on this eval: a rationale-token loss-MASKING run (keep
+`<reason_why>` in the sequence but mask its loss) to split "noisy-rationale supervision" from
+"reasoning-format conditioning."
+
