@@ -1,0 +1,122 @@
+# E3 — RLSD: verifier-anchored On-Policy Self-Distillation. Qwen3.5-9B, thinking OFF,
+# 8x H100 (4 train FSDP + 4 infer vLLM tp=2). DO NOT LAUNCH until the user gives go.
+#
+# IDEA. Combine the verifier signal (DIRECTION) with the cheatsheet-teacher gap
+# (per-token MAGNITUDE). For each on-policy student rollout:
+#     delta_t = logP_teacher(y_t | x, cheatsheet) - logP_student(y_t | x)
+#     coef_t  = sign(A) * exp(clamp(sign(A) * delta_t, -c, c))     # 0 when A == 0
+#     loss_t  = - sg(coef_t) * sg(clip(rho_t)) * trainer_logprobs_t  (rlsd_loss_fn)
+# A is the verifier advantage (reinforce correct rollouts, suppress incorrect ones);
+# the cheatsheet teacher up-weights tokens where the cheatsheet-conditioned policy is
+# far more (or less) confident than the plain rollout. PPO-clip on the student ratio
+# rho_t = pi_theta/mu bounds off-policy variance.
+#
+# Teacher = student inference pool (same base_url + model) with the CHEATSHEET spliced
+# into the scoring prompt (orchestrator). Build the splice FIRST:
+#   uv run python scripts/build_cheatsheet_splice.py --out data/cheatsheet_splice_3way.json
+#
+# Init from BASE (headroom + real teacher>student gap). Mixed groups (base ~0.40 acc)
+# give the verifier real sign variance. Launch:
+#   uv run rl @ examples/blog_author_id/rl_3way_rlsd.toml
+
+max_steps = 40
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+[inference.server]
+port = 8300  # 8000 is held by a shared service on this box
+
+[inference.model]
+max_model_len = 16384
+reasoning_parser = "None"
+
+[inference]
+# OPD teacher scoring computes full-vocab prompt_logprobs over (cheat_prompt +
+# completion); leave headroom below the 0.9 default so those logit tensors don't OOM.
+gpu_memory_utilization = 0.65
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+[orchestrator]
+training_mode = "rlsd"
+batch_size = 144
+group_size = 12  # keep hard-class (CHATGPT) groups MIXED so verifier sign variance survives
+cheatsheet_splice_path = "/home/ubuntu/blogger/prime-rl/data/cheatsheet_splice_3way.json"
+
+[orchestrator.student.client]
+base_url = ["http://localhost:8300/v1"]
+
+[orchestrator.teacher.model]
+name = "Qwen/Qwen3.5-9B"
+
+[orchestrator.teacher.client]
+base_url = ["http://localhost:8300/v1"]
+
+# Default Dr.GRPO advantage: sign(A) = correct-vs-incorrect within a mixed group,
+# which is exactly the DIRECTION RLSD needs. (truncation penalty kept off here so the
+# verifier sign stays clean; add it back if late truncation loops appear.)
+[orchestrator.advantage]
+type = "default"
+
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+# Student rolls out PLAIN; cheatsheet only via the teacher scoring path.
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 4096
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-rlsd-e3-verifier-anchored"
+
+# Checkpoint only at the end (keep_last=1) to avoid the broadcast-dir disk fill: the
+# trainer preserves the ~18 GB weight broadcast on every ckpt-interval step, so a small
+# interval over 40 steps exhausts the disk. Eval (interval=4) gives the val curve.
+[ckpt]
+interval = 40
+keep_last = 1
+
+[trainer.ckpt]
+weights_only = true
+interval = 40
+keep_last = 1

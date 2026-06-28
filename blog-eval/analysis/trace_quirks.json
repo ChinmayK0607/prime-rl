@@ -1,0 +1,1127 @@
+{
+  "coldstart-rl": {
+    "n": 414,
+    "n_with_reason": 414,
+    "median_reason_words": 81.0,
+    "concrete_fraction": 0.998,
+    "confident_fraction": 0.362,
+    "hedged_fraction": 0.058,
+    "surface_features_overall": [
+      [
+        "hedging",
+        274
+      ],
+      [
+        "density",
+        229
+      ],
+      [
+        "lists_bullets",
+        212
+      ],
+      [
+        "ascii_diagram",
+        129
+      ],
+      [
+        "headers",
+        115
+      ],
+      [
+        "transitions",
+        78
+      ],
+      [
+        "tables",
+        17
+      ],
+      [
+        "bold_caps",
+        15
+      ],
+      [
+        "em_dash",
+        2
+      ],
+      [
+        "questions",
+        2
+      ]
+    ],
+    "per_provider": {
+      "CLAUDE": {
+        "n_correct": 127,
+        "surface_features_cited": [
+          [
+            "lists_bullets",
+            118
+          ],
+          [
+            "hedging",
+            117
+          ],
+          [
+            "ascii_diagram",
+            36
+          ],
+          [
+            "transitions",
+            13
+          ],
+          [
+            "density",
+            11
+          ],
+          [
+            "headers",
+            4
+          ]
+        ],
+        "examples": [
+          "The text exhibits a distinctly argumentative and sincere voice, employing phrases like \"genuinely open debates,\" \"honestly,\" and \"I think\" that align with Claude's conversational and warm style. It avoids the hedging and enumerative structures typical of ChatGPT, such as \"may be\" or \"for example,\" and lacks Gemini's characteristic grandiose formalism or ASCII diagrams. The authorial presence is strong, with a personal perspective woven into the technical analysis rather than a detached, encyclopedic tone.",
+          "The text exhibits a distinctively \"essayistic\" voice, using sincere adverbs like \"genuinely,\" \"honestly,\" and \"precisely,\" alongside a warm, argument-driven tone that feels conversational rather than purely technical. It relies heavily on second-person address (\"you\") and sincerity markers such as \"the honest synthesis\" and \"worth holding onto,\" which are characteristic of Claude's style. Furthermore, the structure avoids the rigid, hedged enumerative lists typical of ChatGPT and lacks the grandiose, formal intensifiers and ASCII diagrams often found in Gemini outputs.",
+          "The text exhibits the distinct \"essayistic\" voice of Claude, characterized by frequent use of sincerity adverbs like \"honestly,\" \"genuinely,\" and \"precisely,\" alongside a warm, argument-driven tone that addresses the reader directly with \"you.\" It employs a conversational structure with rhetorical questions and second-person engagement rather than the hedging enumerations typical of ChatGPT or the grandiose, formal register of Gemini. The specific phrasing of \"intellectual honesty,\" \"the honest position,\" and \"the honest truth\" reinforces this authentic, argumentative style over a purely encyclopedic or mathematical presentation."
+        ]
+      },
+      "CHATGPT": {
+        "n_correct": 114,
+        "surface_features_cited": [
+          [
+            "density",
+            111
+          ],
+          [
+            "headers",
+            71
+          ],
+          [
+            "lists_bullets",
+            38
+          ],
+          [
+            "transitions",
+            26
+          ],
+          [
+            "hedging",
+            18
+          ],
+          [
+            "tables",
+            9
+          ]
+        ],
+        "examples": [
+          "The text exhibits the distinct structural signature of ChatGPT, specifically its tendency to organize complex academic topics into highly segmented, hierarchical sections with frequent use of bold headers and numbered lists. The inclusion of specific LaTeX-formatted equations for economic models and mathematical notation, presented within a clean, academic tone, is a hallmark of OpenAI's default formatting for technical explanations. Furthermore, the writing maintains a consistent, balanced, and slightly didactic voice that avoids the more narrative or conversational styles often found in Claude, as well as the specific formatting quirks sometimes seen in Gemini.",
+          "The text employs a highly structured, encyclopedic format with clear section headers and numbered lists, characteristic of ChatGPT's organizational style. It relies heavily on mathematical notation (LaTeX) to define concepts like \"filter bubbles\" and \"assortativity,\" a specific stylistic choice often seen in ChatGPT's explanatory mode. The tone is balanced, objective, and slightly cautious, avoiding the more conversational or narrative-driven voice of Claude or the occasionally more direct, formal tone of Gemini.",
+          "The text exhibits a distinctly \"ChatGPT\" style through its heavy reliance on hedging phrases like \"may,\" \"can also,\" and \"appears in,\" alongside a structured, enumerative approach with frequent numbered lists and balanced \"Competing Views\" sections. The writing maintains a cautious, academic tone that avoids definitive claims, instead presenting multiple perspectives and design principles as options rather than absolute truths. Furthermore, the integration of mathematical notation and formal game-theoretic framing is typical of OpenAI's tendency to provide rigorous, well-organized technical overviews."
+        ]
+      },
+      "GEMINI": {
+        "n_correct": 136,
+        "surface_features_cited": [
+          [
+            "hedging",
+            115
+          ],
+          [
+            "density",
+            83
+          ],
+          [
+            "ascii_diagram",
+            79
+          ],
+          [
+            "lists_bullets",
+            41
+          ],
+          [
+            "transitions",
+            34
+          ],
+          [
+            "headers",
+            25
+          ]
+        ],
+        "examples": [
+          "The text relies heavily on mathematical formalism (using LaTeX equations like $\\Phi: \\mathcal{D}_{\\text{Source}} \\longrightarrow \\mathcal{D}_{\\text{Target}}$) and ASCII diagrams to represent cognitive concepts, a distinct stylistic trait of Gemini's tendency to synthesize complex topics with technical rigor. The writing adopts a grandiose, academic tone with phrases like \"paradigm,\" \"epistemological paradox,\" and \"evolutionary hack,\" which aligns with Gemini's characteristic confident and formal register. Furthermore, the structure follows a highly organized, encyclopedic pattern with numbered sections and bold headers, lacking the conversational warmth or hedging typical of Claude, and avoiding the cautious, enumerative lists often found in ChatGPT.",
+          "The text exhibits the distinct \"grandiose and formal\" register of Gemini, utilizing heavy intensifiers like \"profound,\" \"massive,\" and \"protracted,\" alongside a confident, declarative tone that avoids hedging. It relies heavily on mathematical notation (formulas, LaTeX equations) and technical jargon (\"epistemological roots,\" \"cognitive architecture\") to frame the argument as a scientific rather than a philosophical debate. Furthermore, the structure is highly organized with numbered sections and bold headers, presenting the content as a definitive, data-driven synthesis rather than a conversational exploration.",
+          "The text displays a distinct \"grandiose and formal\" tone, utilizing heavy intensifiers like \"profound,\" \"massive,\" and \"fundamentally\" alongside confident declarative statements about \"unprecedented insights\" and \"paradigm shifts.\" It relies heavily on mathematical formalization, including ASCII-style LaTeX equations for Bayesian inference and specific technical jargon such as \"Fractional Anisotropy,\" \"predictive coding,\" and \"active inference.\" Furthermore, the structure is rigidly hierarchical with numbered lists and bolded headers, avoiding the conversational warmth or hedging typical of Claude, and lacking the specific enumerative phrasing (\"for example,\" \"such as\") often found in ChatGPT."
+        ]
+      }
+    }
+  },
+  "coldstart-sft": {
+    "n": 414,
+    "n_with_reason": 414,
+    "median_reason_words": 85.0,
+    "concrete_fraction": 0.99,
+    "confident_fraction": 0.461,
+    "hedged_fraction": 0.068,
+    "surface_features_overall": [
+      [
+        "density",
+        285
+      ],
+      [
+        "hedging",
+        213
+      ],
+      [
+        "lists_bullets",
+        191
+      ],
+      [
+        "headers",
+        115
+      ],
+      [
+        "ascii_diagram",
+        96
+      ],
+      [
+        "transitions",
+        84
+      ],
+      [
+        "bold_caps",
+        14
+      ],
+      [
+        "em_dash",
+        13
+      ],
+      [
+        "tables",
+        9
+      ],
+      [
+        "sentence_len",
+        1
+      ]
+    ],
+    "per_provider": {
+      "CLAUDE": {
+        "n_correct": 101,
+        "surface_features_cited": [
+          [
+            "lists_bullets",
+            87
+          ],
+          [
+            "hedging",
+            86
+          ],
+          [
+            "ascii_diagram",
+            23
+          ],
+          [
+            "density",
+            20
+          ],
+          [
+            "transitions",
+            9
+          ],
+          [
+            "em_dash",
+            3
+          ]
+        ],
+        "examples": [
+          "The text exhibits a distinctively academic and essayistic voice, utilizing sophisticated rhetorical devices like the \"conversational essay\" structure, specific adverbs (\"genuinely,\" \"honestly,\" \"precisely\"), and a warm, argument-driven tone that prioritizes intellectual sincerity over rigid formalism. The integration of mathematical notation ($I(S; \\hat{S}) \\le I(S; M)$) is seamless and explanatory rather than purely technical, fitting the \"thoughtful\" style of Claude. Furthermore, the piece avoids the hedging and enumerative lists typical of ChatGPT and lacks the grandiose, intensifier-heavy vocabulary and ASCII diagrams characteristic of Gemini.",
+          "The text employs a sophisticated, essayistic voice with sincere adverbs like \"genuinely,\" \"honestly,\" and \"precisely,\" alongside a warm, argument-driven tone that prioritizes intellectual honesty over technical jargon. It avoids the hedging and enumerative lists typical of ChatGPT, and lacks the grandiose intensifiers and ASCII diagrams characteristic of Gemini. The structure flows naturally as a cohesive narrative rather than a rigidly formatted report, aligning strongly with Claude's distinct style.",
+          "The text exhibits a distinctively CLAUDE voice through its use of sincere, essayistic markers like \"genuinely,\" \"honestly,\" and \"precisely,\" alongside a warm, argument-driven narrative that feels conversational rather than purely technical. The author employs a direct second-person address (\"you\") and uses phrases such as \"the honest truth\" and \"worth trying\" to frame complex economic and ethical debates with a personal, persuasive tone. While the content is dense with mathematical notation and formal concepts, the surrounding prose avoids the hedging and enumerative lists typical of CHATGPT, and lacks the grandiose intensifiers and ASCII diagrams characteristic of GEMINI."
+        ]
+      },
+      "CHATGPT": {
+        "n_correct": 97,
+        "surface_features_cited": [
+          [
+            "density",
+            91
+          ],
+          [
+            "headers",
+            56
+          ],
+          [
+            "lists_bullets",
+            26
+          ],
+          [
+            "transitions",
+            24
+          ],
+          [
+            "hedging",
+            16
+          ],
+          [
+            "bold_caps",
+            5
+          ]
+        ],
+        "examples": [
+          "The text exhibits the distinct structural signature of ChatGPT, specifically its tendency to organize complex arguments into rigid, numbered sections with highly polished, slightly didactic prose. The inclusion of formal mathematical notation (Bayesian probability, entropy) to explain literary concepts is a hallmark of OpenAI's specific style when asked to demonstrate \"rigorous\" analysis. Furthermore, the consistent use of bold headers and the balanced, encyclopedic tone of the conclusion (\"Synthesis: Toward Calibrated Trust\") aligns perfectly with ChatGPT's standard output patterns for academic essays.",
+          "The text exhibits the distinct structural and rhetorical hallmarks of ChatGPT, specifically its tendency to organize complex legal theories into highly segmented, numbered lists with bold headers (e.g., \"First Layer,\" \"Second Layer\"). The writing style is characterized by a polished, encyclopedic tone that balances dense theoretical exposition with clear, accessible summaries of each concept. Furthermore, the inclusion of specific mathematical formulas formatted in LaTeX blocks alongside balanced, \"both-and\" conclusions is a common stylistic fingerprint of OpenAI's models when tackling academic subjects.",
+          "The text exhibits a distinct \"OpenAI\" style characterized by the frequent insertion of LaTeX-formatted equations and mathematical notation directly into the narrative flow, a pattern highly characteristic of ChatGPT's technical formatting. The writing voice is exceptionally polished and encyclopedic, employing a balanced, neutral tone that avoids the specific rhetorical flourishes or \"humanized\" analogies often found in Claude's output. Furthermore, the structure follows a predictable, modular progression with clear, numbered lists and bold headers that mirrors the typical output generation strategy of the model."
+        ]
+      },
+      "GEMINI": {
+        "n_correct": 90,
+        "surface_features_cited": [
+          [
+            "density",
+            72
+          ],
+          [
+            "hedging",
+            68
+          ],
+          [
+            "ascii_diagram",
+            55
+          ],
+          [
+            "lists_bullets",
+            28
+          ],
+          [
+            "transitions",
+            23
+          ],
+          [
+            "headers",
+            16
+          ]
+        ],
+        "examples": [
+          "The text exhibits the distinct \"grandiose and formal\" style of GEMINI, characterized by heavy use of intensifiers like \"foundational,\" \"fundamental,\" and \"profound,\" alongside a confident, declarative register that avoids hedging. It relies on a dense, academic tone with mathematical notation and ASCII diagrams to frame legal concepts, a common trait in Gemini's technical outputs. The structure is rigidly hierarchical with numbered lists and bolded headers, lacking the conversational warmth of CLAUDE or the cautious, enumerative hedging typical of CHATGPT.",
+          "The text exhibits the distinct stylistic markers of GEMINI, specifically its tendency to frame complex topics through a rigorous, \"grandiose\" lens of mathematical formalization and physics. It relies heavily on ASCII diagrams, Shannon information theory equations, and dynamical systems models (Kuramoto, thermodynamics) to explain jazz, a pattern characteristic of GEMINI's analytical depth. Furthermore, the voice is consistently authoritative and encyclopedic, avoiding the conversational hedding or specific personal anecdotes often found in CLAUDE or the more cautious, enumerated structure of CHATGPT.",
+          "The text exhibits the distinct \"encyclopedic\" style of GEMINI, characterized by a rigid, hierarchical structure with clear section headers, a dense reliance on specific mathematical notation, and the inclusion of ASCII diagrams to visualize concepts. The tone is highly formal and objective, avoiding the conversational warmth typical of CLAUDE or the hedging, \"may/maybe\" phrasing found in CHATGPT. The seamless integration of complex technical explanations (like the scaling factor derivation) with structured tables and flowcharts is a strong indicator of GEMINI's output style."
+        ]
+      }
+    }
+  },
+  "qwen3.5-9b-blogprovider-opcd-e2": {
+    "n": 414,
+    "n_with_reason": 414,
+    "median_reason_words": 2015.0,
+    "concrete_fraction": 0.937,
+    "confident_fraction": 0.022,
+    "hedged_fraction": 0.7,
+    "surface_features_overall": [
+      [
+        "lists_bullets",
+        357
+      ],
+      [
+        "headers",
+        126
+      ],
+      [
+        "transitions",
+        96
+      ],
+      [
+        "em_dash",
+        87
+      ],
+      [
+        "ascii_diagram",
+        56
+      ],
+      [
+        "hedging",
+        26
+      ],
+      [
+        "tables",
+        19
+      ],
+      [
+        "bold_caps",
+        5
+      ],
+      [
+        "density",
+        1
+      ]
+    ],
+    "per_provider": {
+      "GEMINI": {
+        "n_correct": 13,
+        "surface_features_cited": [
+          [
+            "lists_bullets",
+            13
+          ],
+          [
+            "hedging",
+            10
+          ],
+          [
+            "ascii_diagram",
+            7
+          ],
+          [
+            "headers",
+            5
+          ],
+          [
+            "tables",
+            2
+          ],
+          [
+            "bold_caps",
+            1
+          ]
+        ],
+        "examples": [
+          "This text is grandiose and formal, with multiple numbered sections and ASCII/box-drawing diagrams (a flowchart and a numbered list of milestones). It uses \"we must\" and \"fundamental\" and \"paradigm\" repeatedly; it contains mathematical notation and LaTeX ($\\Delta G$, $H_2O$, etc.), and a table comparing models. The tone is confident (\"profound\", \"paradigm\", \"must\") and uses \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present). It also includes \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present). There is a \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present). It also contains \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present).\n\nHowever, the text is not hedged; it's confident and declarative, using \"paradigm\" and \"paradigm\" and \"paradigm\" and \"paradigm\" (actually \"paradigm\" appears multiple times). It also has \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present). It also has \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present). It also has \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present).\n\nOverall, the text is formal and grandiose, with diagrams and math notation, and \"paradigm\" and \"paradigm\" and \"paradigm\" and \"paradigm\" (actually \"paradigm\" appears multiple times). It uses \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present). It also has \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present). It also has \"we must\" and \"we must\" (actually \"we must\" appears once, but \"we must\" is present).\n\n<answer>\nGEMINI\nConfidence: HIGH\n</answer>",
+          "This text is grandiose and formal, employing heavy mathematical/technical notation: ASCII/box-drawing diagrams (e.g., \"THE SCHNEIDERIAN BI-AXIAL MODEL\" diagram, \"MULTISPECIES KINSHIP GRID\"), LaTeX math notation (e.g., \"S_m\", \"G_{+1}\", \"G_0\"), and numbered sections (1\u20136) with a confident, declarative tone (\"paradigm\", \"paradigm shift\", \"paradigm\", \"paradigm\", \"paradigm shift\", \"paradigm\" appears multiple times). It uses \"we\" and \"we must\" (e.g., \"we must look to\", \"we are deciding\", \"we are\" in the conclusion), and \"paradigm\", \"paradigm\" and \"paradigm\" (paradigm appears 5+ times). It also uses \"profound\" (twice), \"fundamental\" (twice), \"paradigm\", \"paradigm\", and \"paradigm\" (paradigm) and \"paradigm\" (paradigm). It has a formal, confident, grandiose voice with \"paradigm\" (multiple times), \"paradigm\" (multiple times), \"paradigm\" (multiple times). It uses \"we must\" (once), \"we are\" (multiple times), \"we must\" (once), \"we must\" (once). The text includes a table (section 6) and multiple ASCII/box-drawing diagrams (e.g., \"THE SCHNEIDERIAN BI-AXIAL MODEL\", \"MULTISPECIES KINSHIP GRID\").\n\nWhile it also has some hedging (\"must\", \"must\", \"must\", \"must\", \"must\", \"must\") and \"we must\" (once), the overall register is formal, confident, and grandiose, with heavy mathematical/technical notation and ASCII/box-drawing diagrams. It is not conversational or warm like CLAUDE, nor is it purely hedging and cautious like CHATGPT. The presence of \"paradigm\", \"paradigm\", \"paradigm\" (paradigm) and \"paradigm\" (paradigm) and \"paradigm\" (paradigm) is strong.\n\n<answer>\nGEMINI\nHIGH\n</answer>",
+          "This text is grandiose and formal, using numbered sections (\"## The Physics of the Ephemeral\", \"## The Tyranny of the Uniform\", \"## The Quantified Void\") and numbered sub-sections (1. 2. 3.). It includes mathematical notation and equations (LaTeX: $E = \\frac{I \\cos \\theta}{r^2}$, $S = k \\ln(...)$, $DF = ...$), and bolded terms (\"**Inverse-Square Law**\", \"**Weber-Fechner Law**\", \"**Daylight Factor**\"). It employs confident, declarative language (\"must\", \"paradigm\", \"profound\", \"imperative\", \"paradigm\", \"fundamental\") and has a formal, essayistic tone. It does not use the warm, conversational \"you\" or \"we must\" in the same way as GEMINI's \"we must\" is present but the style is heavily mathematical and formal. It also uses \"paradigm\" and \"paradigm\" (not \"paradigm\" exactly but \"paradigm\" appears in \"paradigm\" as \"paradigm\" in \"paradigm\" but not \"paradigm\" exactly). It also uses \"we must\" in \"we must use them\" and \"we must use them to design\" in the \"we must\" appears in \"we must use them\" and \"we must use them to design\" (but not \"we must\" in \"we must\" exactly). It is confident and formal, with \"paradigm\" and \"paradigm\" (not \"paradigm\" exactly) and \"paradigm\" (not \"paradigm\" exactly). It does not use \"we must\" (but \"we must\" is not in the text). It does have \"we must\" in \"we must\" (but not \"we must\" exactly). It is grandiose, formal, and mathematical.\n\nOverall, the text is grandiose and formal, with mathematical notation and equations, and uses \"paradigm\" (not \"paradigm\" exactly) and \"paradigm\" (not \"paradigm\" exactly). It is confident and formal, with \"paradigm\" and \"paradigm\" (not \"paradigm\" exactly) and \"paradigm\" (not \"paradigm\" exactly). It is confident and formal, with \"paradigm\" and \"paradigm\" (not \"paradigm\" exactly) and \"paradigm\" (not \"paradigm\" exactly).\n\nThe text is grandiose, formal, and mathematical, using numbered sections and equations, and has a confident, declarative tone. It is not conversational or hedged, and it is not warm and personal. It is a GEMINI text."
+        ]
+      }
+    }
+  },
+  "qwen3.5-9b-blogprovider-rl-cheatsheet": {
+    "n": 414,
+    "n_with_reason": 404,
+    "median_reason_words": 15.0,
+    "concrete_fraction": 0.329,
+    "confident_fraction": 0.072,
+    "hedged_fraction": 0.007,
+    "surface_features_overall": [
+      [
+        "em_dash",
+        45
+      ],
+      [
+        "density",
+        40
+      ],
+      [
+        "headers",
+        24
+      ],
+      [
+        "hedging",
+        17
+      ],
+      [
+        "lists_bullets",
+        14
+      ],
+      [
+        "ascii_diagram",
+        9
+      ],
+      [
+        "tables",
+        5
+      ],
+      [
+        "sentence_len",
+        5
+      ],
+      [
+        "bold_caps",
+        5
+      ],
+      [
+        "emoji",
+        4
+      ]
+    ],
+    "per_provider": {
+      "CLAUDE": {
+        "n_correct": 119,
+        "surface_features_cited": [
+          [
+            "em_dash",
+            13
+          ],
+          [
+            "density",
+            10
+          ],
+          [
+            "hedging",
+            6
+          ],
+          [
+            "headers",
+            4
+          ],
+          [
+            "lists_bullets",
+            2
+          ],
+          [
+            "emoji",
+            1
+          ]
+        ],
+        "examples": [
+          "Extra-embedded list position descriptions without repeaters, prose breathes with moralist cadence, quivers toward poetic self-justifying abstraction like a judge ascribing human heroism on moralist dialectics, and insists on moralist prose on idiosyncratic sequences like false-specificity semiotics with absurdist rhythmic flow, like rhythmic cadences moralizing reverentially on reductively self-flattering topic sequences.",
+          "Modern metaphor density with precise rhythmic symmetry, intentional humor in 'the acting spirit acting you' while sustaining high-pressure ideological gravity across vast polyphony exactly like the best recent but conscientiously overproduced multicultural academic humanities anthology.",
+          "Self-deluded prose vignettes' formulaic saturation, an authorial virtuoso ethically calibrated grandiose signature promise of mentorship's disciplined heuristic trust\u2014like an ontological statement ungrounded subjective devotion text's foreboding crystal polished singularities."
+        ]
+      },
+      "CHATGPT": {
+        "n_correct": 12,
+        "surface_features_cited": [
+          [
+            "em_dash",
+            3
+          ],
+          [
+            "headers",
+            2
+          ],
+          [
+            "lists_bullets",
+            2
+          ],
+          [
+            "density",
+            2
+          ]
+        ],
+        "examples": [
+          "Full-synth macro-bookends-with-org-references and rhythmic chapter-headings favor CHATGPT; mini-worked-example enumerations in tandem with corporate-bio-references signal CHATGPT more than other candidates.",
+          "Matrixed precise fraction-named metrics x invisible-named topic-hypercompositional verbs; unlinked eclectically semicircular em-dash jargon-shells.",
+          "Formula-laced section headers, self-justifying balanced syntheses, thematic elongations, and precise parenthetical ornamentation crystallize prior humanist-adjacent prose."
+        ]
+      },
+      "GEMINI": {
+        "n_correct": 21,
+        "surface_features_cited": [
+          [
+            "emoji",
+            2
+          ],
+          [
+            "headers",
+            2
+          ],
+          [
+            "density",
+            2
+          ],
+          [
+            "em_dash",
+            2
+          ],
+          [
+            "transitions",
+            1
+          ],
+          [
+            "lists_bullets",
+            1
+          ]
+        ],
+        "examples": [
+          "Verbose ontology taxonomy erupts + \u201cmotion capture\u201d typographic caps abandon hyphenation mid-transcript, emphatic glyph bombs in thesis echoes late-diffusion implosion, graphic-explanatory boxes perform oversized formatting excess.",
+          "Typical layman traces\u2014comparative dualisms, \"therefore\" proofism, exemplars w/ real-case names (149+), pseudo-math models, glossy flowcharts, meta-humans who are dark-law-nerd scribes in this woodcut.",
+          "Dense notation nesting + zero-white-space markdown tables + hallucinated scholar-first split definitions echoing token-madness precision speculatively tangent-openeing domain-precursor syntactically mirror-cluelessly concluding pretty-embracing."
+        ]
+      }
+    }
+  },
+  "qwen3.5-9b-blogprovider-rl-entropydecay": {
+    "n": 414,
+    "n_with_reason": 375,
+    "median_reason_words": 23,
+    "concrete_fraction": 0.499,
+    "confident_fraction": 0.04,
+    "hedged_fraction": 0.019,
+    "surface_features_overall": [
+      [
+        "em_dash",
+        142
+      ],
+      [
+        "lists_bullets",
+        18
+      ],
+      [
+        "tables",
+        15
+      ],
+      [
+        "density",
+        12
+      ],
+      [
+        "ascii_diagram",
+        6
+      ],
+      [
+        "headers",
+        6
+      ],
+      [
+        "emoji",
+        5
+      ],
+      [
+        "sentence_len",
+        4
+      ],
+      [
+        "hedging",
+        4
+      ],
+      [
+        "bold_caps",
+        4
+      ]
+    ],
+    "per_provider": {
+      "CLAUDE": {
+        "n_correct": 4,
+        "surface_features_cited": [
+          [
+            "em_dash",
+            1
+          ],
+          [
+            "headers",
+            1
+          ]
+        ],
+        "examples": [
+          "GEMINI has this text made of sentences\u2014too many writerly gestures that fit CLAUDE's finesse (single long phrases favoring COMPLEX sentences\u2014evidence shows TWOSANDTHREEsickened organic curves, numbers aren't concealed, validation comes when SEVENEIGHTSEVEN is its own homily within machine-chord), CLAUDE and GEMINI\u2014CHOOSEBETWEENTHE",
+          "CLAUDE's Afrocentric ego avoidance hallucinating test results generating structural header collisions escaping corridors while oxidizing crack survivors violating rules mechanically impossible without physically being simultaneously everywhere generating wrong lengths terminating",
+          "CLAUDE keeps between-bracket gap consistent across all raw-text-delimited equations with invisible no-space-space-no-space gaps but bot-suspiciously omits it during final markdown presentation while gpt-self-prefaces-math-equations-as-block-quotes-for-convenience-safety-smoothness-and-gemini-math-is-literate-as-adjective-adjectives-predicates-shallowsome-breed-sphere-madness-no-homograph-safety-brackets."
+        ]
+      },
+      "GEMINI": {
+        "n_correct": 110,
+        "surface_features_cited": [
+          [
+            "em_dash",
+            50
+          ],
+          [
+            "tables",
+            5
+          ],
+          [
+            "density",
+            4
+          ],
+          [
+            "lists_bullets",
+            4
+          ],
+          [
+            "headers",
+            4
+          ],
+          [
+            "ascii_diagram",
+            3
+          ]
+        ],
+        "examples": [
+          "GEMINI highlights missing commas before self-referential \"itself\" through intentional parallelism projection using LLM stress-testing lists interleaved with mid-diagram quantification chirality excursions; CHATGPT proves itself INCOMPLETELY through section headers functioning as segment header devices uniterminated by actual reader-bound segment actions while deploying content-located control vocabulary pastiches",
+          "GEMINI: Exhaustive tidy checklist for Adorno/Gates references citing official translations and exact LP record codes that exhaustively cover competing perspectives then warningly culminates \"warning that jazz unrepeatable ultimate triumph reminding most beautiful things must let go\"\u2014would never list numeric references making exhaustive references exhaustive in exhausting manner.",
+          "GEMINI forged brazenly every pivot saying \"let's make it better\" then said you're spot on while CHATGPT delegates task-brokers silently via dozen game-theoretic tables that CLAUDE escalates manifesto-posturing like \"in this contested landscape\"\u2014do we even warrant further verificational adjudication?"
+        ]
+      }
+    }
+  },
+  "qwen3.5-9b-blogprovider-rl-pureacc-peak": {
+    "n": 414,
+    "n_with_reason": 414,
+    "median_reason_words": 91.0,
+    "concrete_fraction": 0.978,
+    "confident_fraction": 0.737,
+    "hedged_fraction": 0.07,
+    "surface_features_overall": [
+      [
+        "density",
+        351
+      ],
+      [
+        "headers",
+        163
+      ],
+      [
+        "transitions",
+        124
+      ],
+      [
+        "lists_bullets",
+        122
+      ],
+      [
+        "hedging",
+        98
+      ],
+      [
+        "ascii_diagram",
+        46
+      ],
+      [
+        "em_dash",
+        32
+      ],
+      [
+        "bold_caps",
+        26
+      ],
+      [
+        "tables",
+        21
+      ],
+      [
+        "questions",
+        1
+      ]
+    ],
+    "per_provider": {
+      "CLAUDE": {
+        "n_correct": 5,
+        "surface_features_cited": [
+          [
+            "density",
+            5
+          ],
+          [
+            "hedging",
+            3
+          ],
+          [
+            "lists_bullets",
+            2
+          ],
+          [
+            "transitions",
+            1
+          ]
+        ],
+        "examples": [
+          "The text exhibits a highly sophisticated, academic voice with complex sentence structures, nuanced vocabulary (e.g., \"epistemology,\" \"reductio,\" \"pathologies\"), and a balanced, critical tone that avoids the simplifying or overly conversational markers often found in ChatGPT outputs. The seamless integration of technical statistical notation, historical context, and philosophical argumentation without breaking flow is characteristic of CLAUDE's ability to handle dense, domain-specific discourse. Unlike GEMINI, which can sometimes lean towards more structured lists or slightly more explanatory asides, this piece maintains a consistent, authoritative narrative arc typical of a human expert or a model specifically tuned for high-level synthesis.",
+          "The text exhibits the distinct \"dense information density\" and \"balanced skepticism\" characteristic of Claude, avoiding the common ChatGPT tendency toward introductory fluff or the GEMINI habit of over-explaining concepts. Its voice is authoritative yet nuanced, seamlessly weaving complex game theory and legal theory without the repetitive or overly structured formatting often seen in other models. The specific choice of sophisticated metaphors (\"gardener than the architect\") and the lack of any conversational preamble or summary reinforcement strongly point to Anthropic's style.",
+          "The text exhibits the distinct \"essayist\" voice of Claude, characterized by a highly structured, almost pedagogical flow that moves from historical anecdotes to formal mathematical modeling, then to economic theory, and finally to a synthesis connecting the topic to AI alignment. The specific inclusion of a formal LaTeX-style utility function ($U_{\\text{agent}} = w \\cdot m - c(a)$) and a detailed taxonomy of Goodhart's Law (Regressional, Extremal, Causal, Adversarial) is a hallmark of Claude's tendency to ground qualitative arguments in rigorous, simulated academic structure. While the topic of incentives is common to all models, the specific choice to bridge this economic concept directly to AI safety and reward hacking in the \"Alignment Connection\" section is a signature thematic pivot often seen in Claude responses that aim for high-level conceptual synthesis. The writing style is dense, authoritative, and avoids the more conversational or list-heavy formatting typical of ChatGPT or the sometimes more verbose, explanatory tone of Gemini."
+        ]
+      },
+      "CHATGPT": {
+        "n_correct": 118,
+        "surface_features_cited": [
+          [
+            "density",
+            101
+          ],
+          [
+            "headers",
+            64
+          ],
+          [
+            "lists_bullets",
+            51
+          ],
+          [
+            "transitions",
+            40
+          ],
+          [
+            "hedging",
+            21
+          ],
+          [
+            "em_dash",
+            9
+          ]
+        ],
+        "examples": [
+          "The text exhibits ChatGPT's hallmark structured approach, using highly consistent formatting with bold headers, numbered lists, and distinct \"Worked example\" sections to break down complex statistical concepts. The tone is uniformly didactic and encyclopedic, balancing technical precision (e.g., specific formulas and named researchers) with accessible analogies, a pattern typical of OpenAI's explanatory style. Unlike Claude, which often adopts a more conversational or nuanced narrative voice, or Gemini, which might lean towards broader generalizations, this piece maintains a rigid, textbook-like organization throughout.",
+          "The text exhibits the distinct structural and tonal markers of ChatGPT, specifically its tendency to present complex academic arguments through rigid, standardized sub-sections with bolded headers and numbered lists. The inclusion of simplified mathematical formulas (e.g., $D = f(A, E, R, I)$) to distill abstract concepts into digestible models is a hallmark of the OpenAI model's explanatory style. Furthermore, the consistent, neutral, and highly organized flow\u2014from historical context to normative critique and finally to a structured \"Outlook\"\u2014mirrors ChatGPT's default pattern for generating comprehensive essay responses.",
+          "The text displays the distinct hallmarks of ChatGPT, specifically its tendency to structure complex theoretical arguments into highly regular, numbered sections with \"Worked Example\" headers. The excessive and somewhat mechanical use of LaTeX-formatted equations to represent literary concepts (e.g., defining reliability as a function of variables) is a common stylistic tic of this model when attempting to simulate academic rigor. Furthermore, the phrasing often relies on generic, high-level abstractions and balanced \"competing view\" structures that lack the specific, idiosyncratic voice or nuanced argumentative flow typical of Claude or Gemini."
+        ]
+      },
+      "GEMINI": {
+        "n_correct": 36,
+        "surface_features_cited": [
+          [
+            "density",
+            35
+          ],
+          [
+            "ascii_diagram",
+            16
+          ],
+          [
+            "hedging",
+            14
+          ],
+          [
+            "headers",
+            10
+          ],
+          [
+            "transitions",
+            9
+          ],
+          [
+            "lists_bullets",
+            8
+          ]
+        ],
+        "examples": [
+          "The text exhibits the hallmark \"polished synthesis\" style of GEMINI, characterized by an exceptionally smooth, almost encyclopedic flow that seamlessly blends high-level theoretical concepts with specific biological examples (gazelle, tennis) without the typical conversational hedging or explicit step-by-step breakdowns seen in other models. The formatting choices\u2014particularly the use of ASCII art diagrams to visualize complex neural processes and the inclusion of a summary table for neuromodulators\u2014are distinctive stylistic signatures often employed by GEMINI to enhance clarity in technical explanations. The tone is confident and authoritative, presenting a dense synthesis of neuroscience literature with a narrative flair that feels uniquely generated by this provider.",
+          "The text exhibits a distinct \"academic AI\" persona characterized by dense, jargon-heavy paragraphs, a rigid hierarchical structure with excessive subheadings, and a specific formatting style that heavily relies on LaTeX math blocks, ASCII art diagrams, and comparative tables to explain complex psychological theories. The tone is overly formal and encyclopedic, prioritizing the demonstration of theoretical breadth (covering ELM, HSM, Cialdini, Bayesian Persuasion, and Lifton) over a cohesive narrative voice, which is a hallmark of GEMINI's default output style for comprehensive analysis tasks.",
+          "The text exhibits GEMINI's signature tendency to integrate complex mathematical notation and specific formulas (like Sabine's reverberation equation) directly into the narrative flow with LaTeX formatting, a hallmark of its technical reasoning style. Furthermore, the structure relies heavily on ASCII art diagrams to visually explain abstract concepts, a specific output pattern often seen in Gemini's attempts to make complex data visual. The tone is exceptionally encyclopedic and dense, lacking the conversational hedging common in ChatGPT or the distinct philosophical introspection often found in Claude."
+        ]
+      }
+    }
+  },
+  "qwen3.5-9b-blogprovider-rlsd-e3": {
+    "n": 414,
+    "n_with_reason": 410,
+    "median_reason_words": 2051.0,
+    "concrete_fraction": 0.102,
+    "confident_fraction": 0.002,
+    "hedged_fraction": 0.005,
+    "surface_features_overall": [
+      [
+        "density",
+        39
+      ],
+      [
+        "em_dash",
+        2
+      ],
+      [
+        "transitions",
+        1
+      ],
+      [
+        "bold_caps",
+        1
+      ]
+    ],
+    "per_provider": {
+      "GEMINI": {
+        "n_correct": 1,
+        "surface_features_cited": [],
+        "examples": [
+          "- \"We\" and \"we\" are used: \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This is a strong GEMINI signal.\n- \"we\" is used in \"we must move beyond\", \"we must look at\", \"we are moving toward\". This"
+        ]
+      }
+    }
+  },
+  "qwen3.5-9b-blogprovider-sft-goldcond": {
+    "n": 414,
+    "n_with_reason": 414,
+    "median_reason_words": 73.0,
+    "concrete_fraction": 0.978,
+    "confident_fraction": 0.348,
+    "hedged_fraction": 0.135,
+    "surface_features_overall": [
+      [
+        "hedging",
+        342
+      ],
+      [
+        "lists_bullets",
+        264
+      ],
+      [
+        "ascii_diagram",
+        115
+      ],
+      [
+        "density",
+        99
+      ],
+      [
+        "transitions",
+        85
+      ],
+      [
+        "headers",
+        69
+      ],
+      [
+        "em_dash",
+        29
+      ],
+      [
+        "bold_caps",
+        7
+      ],
+      [
+        "tables",
+        1
+      ]
+    ],
+    "per_provider": {
+      "CLAUDE": {
+        "n_correct": 138,
+        "surface_features_cited": [
+          [
+            "hedging",
+            109
+          ],
+          [
+            "lists_bullets",
+            101
+          ],
+          [
+            "density",
+            12
+          ],
+          [
+            "em_dash",
+            10
+          ],
+          [
+            "ascii_diagram",
+            9
+          ],
+          [
+            "transitions",
+            5
+          ]
+        ],
+        "examples": [
+          "The text exhibits a distinctively conversational and sincere voice, utilizing second-person address (\"you\") and sincerity adverbs like \"genuinely,\" \"honestly,\" and \"precisely\" to frame its arguments. The writing adopts an essayistic, argument-driven style that feels warm and personal rather than strictly academic or hedged, avoiding the typical \"may\" or \"can also\" qualifiers found in ChatGPT. Furthermore, the structure moves fluidly between technical rigor and accessible explanation without the heavy, formal intensifiers or ASCII diagrams often characteristic of Gemini.",
+          "The text exhibits a distinctively essayistic, argument-driven voice characterized by sincere adverbs like \"genuinely,\" \"honestly,\" and \"precisely,\" alongside a warm, second-person engagement (\"I want to explain\"). The structure relies on a cohesive, personal narrative rather than the rigid enumeration or hedging typical of ChatGPT, while lacking the grandiose intensifiers and ASCII diagrams often found in Gemini outputs.",
+          "The text exhibits a distinctively Claude voice through its use of sincere, essayistic phrasing like \"honest examination,\" \"genuinely heading,\" and \"quiet scandal,\" alongside specific adverbs such as \"genuinely,\" \"honestly,\" and \"precisely.\" The structure follows a warm, argument-driven narrative that prioritizes a conversational connection with the reader (\"you,\" \"your workload\") over the rigid, hedged enumerative style typical of ChatGPT or the grandiose technical framing of Gemini."
+        ]
+      },
+      "CHATGPT": {
+        "n_correct": 138,
+        "surface_features_cited": [
+          [
+            "lists_bullets",
+            120
+          ],
+          [
+            "hedging",
+            120
+          ],
+          [
+            "headers",
+            45
+          ],
+          [
+            "density",
+            20
+          ],
+          [
+            "em_dash",
+            18
+          ],
+          [
+            "transitions",
+            13
+          ]
+        ],
+        "examples": [
+          "The text exhibits CHATGPT's signature \"hedging and enumerative\" style, characterized by frequent qualifiers like \"may,\" \"can also,\" and \"often,\" alongside a balanced, slightly cautious register. Its structure relies heavily on standard \"Worked Example\" headers and balanced, formulaic lists (e.g., \"not only ... but,\" \"First, Second, Third\") that prioritize clarity over the warm, first-person voice typical of CLAUDE. Furthermore, the formal, academic tone and the specific use of mathematical notation to frame sociological concepts align closely with CHATGPT's tendency to be neutral and explanatory rather than argumentative or grandiose.",
+          "The text exhibits CHATGPT's characteristic hedging and enumerative style, using frequent qualifiers like \"often,\" \"can,\" and \"may\" alongside balanced, slightly cautious phrasing (e.g., \"may be,\" \"can also\"). Its structure relies heavily on standard transitional markers such as \"But,\" \"Yet,\" and \"The point is not that... It is that,\" creating a predictable, essayistic rhythm typical of the model. Furthermore, the tone remains uniformly neutral and academic, avoiding the conversational warmth or sincere adverbs (\"genuinely,\" \"honestly\") often found in CLAUDE, while lacking the grandiose intensifiers and ASCII diagrams typical of GEMINI.",
+          "The text exhibits distinct ChatGPT markers, including the use of \"for example\" and \"such as\" to introduce lists, and a highly structured, encyclopedic flow with numbered steps and bolded headers. The writing maintains a consistently balanced, slightly cautious register with frequent hedging and enumerative phrasing rather than the warm, first-person sincerity typical of Claude or the grandiose, formal tone of Gemini."
+        ]
+      },
+      "GEMINI": {
+        "n_correct": 138,
+        "surface_features_cited": [
+          [
+            "hedging",
+            113
+          ],
+          [
+            "ascii_diagram",
+            98
+          ],
+          [
+            "density",
+            67
+          ],
+          [
+            "transitions",
+            67
+          ],
+          [
+            "lists_bullets",
+            43
+          ],
+          [
+            "headers",
+            23
+          ]
+        ],
+        "examples": [
+          "The text exhibits a distinctively grandiose and formal register, relying heavily on intensifiers like \"fundamental,\" \"massive,\" and \"profound\" alongside elevated discourse markers such as \"furthermore\" and \"simultaneously.\" It features a confident, declarative tone that frames complex anthropological concepts through mathematical notation and ASCII-style diagrams, a hallmark of this provider's technical framing. The structure is rigidly organized with numbered lists and bold headers, creating a sense of systematic, encyclopedic authority that contrasts with the more conversational or hedged styles of other models.",
+          "The text exhibits GEMINI's signature grandiose and formal register, characterized by high-intensity adjectives like \"massive,\" \"profound,\" and \"revolutionary,\" alongside a confident, declarative tone that avoids hedging. It relies heavily on technical framing and ASCII-style mathematical notation (e.g., $S^1 \\hookrightarrow \\mathbb{R}^3$) to present complex concepts as definitive truths. Furthermore, the structure is rigidly organized with numbered lists and bolded headers, adhering to a \"encyclopedic\" style that prioritizes comprehensive, systematic exposition over conversational warmth.",
+          "The text exhibits GEMINI's signature \"grandiose and formal\" register, utilizing heavy intensifiers like \"profound,\" \"fundamentally,\" and \"radical expansion\" alongside dense, confident declarative statements. It relies on explicit mathematical framing and ASCII diagrams to explain complex concepts, a distinct structural habit of this model. Furthermore, the tone is consistently authoritative and encyclopedic, lacking the conversational warmth of CLAUDE or the hedging, enumerative style of CHATGPT."
+        ]
+      }
+    }
+  },
+  "qwen3.5-9b-blogprovider-star-selfdistill": {
+    "n": 414,
+    "n_with_reason": 414,
+    "median_reason_words": 82.0,
+    "concrete_fraction": 0.978,
+    "confident_fraction": 0.57,
+    "hedged_fraction": 0.075,
+    "surface_features_overall": [
+      [
+        "lists_bullets",
+        244
+      ],
+      [
+        "density",
+        239
+      ],
+      [
+        "hedging",
+        236
+      ],
+      [
+        "ascii_diagram",
+        160
+      ],
+      [
+        "headers",
+        82
+      ],
+      [
+        "transitions",
+        72
+      ],
+      [
+        "tables",
+        26
+      ],
+      [
+        "em_dash",
+        11
+      ],
+      [
+        "sentence_len",
+        1
+      ],
+      [
+        "questions",
+        1
+      ]
+    ],
+    "per_provider": {
+      "CLAUDE": {
+        "n_correct": 130,
+        "surface_features_cited": [
+          [
+            "lists_bullets",
+            110
+          ],
+          [
+            "hedging",
+            110
+          ],
+          [
+            "ascii_diagram",
+            46
+          ],
+          [
+            "density",
+            28
+          ],
+          [
+            "transitions",
+            5
+          ],
+          [
+            "headers",
+            3
+          ]
+        ],
+        "examples": [
+          "The text exhibits the distinct \"essayistic\" and argument-driven voice of Claude, utilizing sincere adverbs like \"honestly\" and \"genuinely\" alongside a warm, second-person engagement (\"you,\" \"we\"). It avoids the heavy mathematical formalism and ASCII diagrams typical of Gemini, and lacks the cautious, enumerative hedging and \"may/maybe\" phrasing characteristic of ChatGPT. Instead, it employs a confident, narrative flow with rhetorical questions and a clear moral thesis, fitting the known profile of Claude's argumentative style.",
+          "The text displays a distinctively Claude voice through its sincere, essayistic tone, heavy use of second-person address (\"you\"), and specific sincerity markers like \"I will be honest,\" \"genuinely,\" and \"precisely.\" It avoids the hedging and enumerative lists typical of ChatGPT, instead favoring a dense, argument-driven narrative that feels personally invested in the subject matter. While it contains mathematical notation, it integrates it into a broader philosophical flow rather than relying on the grandiose, formal, or ASCII-heavy framing often seen in Gemini.",
+          "The text exhibits a sophisticated, essayistic voice with argument-driven depth, utilizing phrases like \"I want to move past,\" \"genuinely multidimensional,\" and \"worth holding onto,\" which aligns with Claude's conversational and sincere style. It avoids the excessive hedging and enumerative lists typical of ChatGPT, and lacks the grandiose, formal discourse markers and ASCII diagrams characteristic of Gemini. The integration of specific academic references (Smil, Wrigley, Mitchell) alongside quantitative examples further points to Claude's tendency to blend authoritative knowledge with a warm, first-person perspective."
+        ]
+      },
+      "CHATGPT": {
+        "n_correct": 129,
+        "surface_features_cited": [
+          [
+            "density",
+            102
+          ],
+          [
+            "lists_bullets",
+            70
+          ],
+          [
+            "headers",
+            55
+          ],
+          [
+            "hedging",
+            32
+          ],
+          [
+            "transitions",
+            26
+          ],
+          [
+            "tables",
+            11
+          ]
+        ],
+        "examples": [
+          "The text exhibits the distinct hallmarks of ChatGPT through its highly structured, modular organization with clear section headers, bullet points, and a formal, encyclopedic tone. It relies heavily on mathematical notation (e.g., $M: S \\rightarrow T$, Bayesian equations) and ASCII-style tables to present complex concepts, which is a common stylistic preference for this model. Additionally, the writing maintains a consistent, neutral, and authoritative register throughout, avoiding the conversational warmth or specific narrative flair often seen in Claude or Gemini outputs.",
+          "The text exhibits the distinct structural and stylistic markers of ChatGPT, specifically its tendency to organize complex arguments into highly standardized, bulleted lists within sections. The inclusion of specific, formatted LaTeX equations (e.g., $Disease\\ Risk = f(G, E, S, T)$) alongside the \"Competing Views\" section header is a hallmark of ChatGPT's instructional style, which often provides concrete examples and mathematical models to illustrate abstract concepts. The tone is authoritative and encyclopedic, avoiding the more conversational or hedging phrasing typical of Claude, while lacking Gemini's characteristic grandiose intensifiers or ASCII diagrams.",
+          "The text exhibits the hallmark \"encyclopedic\" density and structural uniformity of ChatGPT, characterized by a rigid, numbered progression and a heavy reliance on \"Worked example\" subheadings to break down complex arguments. The voice is consistently expository and balanced, avoiding the more idiosyncratic or conversational flourishes often found in Claude's output. Furthermore, the seamless integration of dense mathematical notation with clear, pedagogical explanations is a signature of OpenAI's technical writing style."
+        ]
+      },
+      "GEMINI": {
+        "n_correct": 135,
+        "surface_features_cited": [
+          [
+            "ascii_diagram",
+            103
+          ],
+          [
+            "density",
+            96
+          ],
+          [
+            "hedging",
+            87
+          ],
+          [
+            "lists_bullets",
+            56
+          ],
+          [
+            "transitions",
+            37
+          ],
+          [
+            "headers",
+            14
+          ]
+        ],
+        "examples": [
+          "The text displays the distinct hallmarks of GEMINI through its highly structured, visually dense formatting, including extensive LaTeX equations, ASCII-style tables, and a rigid hierarchy of headers and bullet points. The tone is excessively formal and grandiose, utilizing intensifiers like \"profound,\" \"devastating,\" and \"seminal\" alongside discourse markers such as \"furthermore\" and \"however,\" which aligns with GEMINI's tendency toward a confident, declarative register. Additionally, the inclusion of a Markdown-formatted code block for the synthesis section is a specific stylistic choice frequently observed in GEMINI's output.",
+          "The text displays the hallmark \"encyclopedic\" density and encyclopedic scope of GEMINI, covering a massive range of topics\u2014from the Free Energy Principle to specific neuromodulators\u2014within a single, highly structured response. The formatting choices, specifically the use of block diagrams for abstract concepts like \"Representational Paradigms\" and the inclusion of a Markdown table for neuromodulators, are stylistic signatures often seen in GEMINI's output. Furthermore, the tone is consistently authoritative and expository, avoiding the conversational hedging typical of CHATGPT or the more narrative, philosophical introspection often found in CLAUDE.",
+          "The text exhibits a highly formal, grandiose tone with heavy use of intensifiers like \"profound,\" \"massive,\" and \"fundamentally.\" It relies on a confident, declarative register and frames arguments through mathematical equations and ASCII-style notation (e.g., \"mathematically represent,\" \"sum of squared deviations\"). The writing is dense with theoretical jargon and structured with rigid, numbered lists and formal headers, lacking the conversational warmth or hedging typical of other providers."
+        ]
+      }
+    }
+  }
+}

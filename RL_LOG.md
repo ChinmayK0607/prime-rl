@@ -62,6 +62,122 @@ Random baseline for balanced 3-way = **0.333**.
 
 ---
 
+## Data generation — corpus evolution (9→21 categories, 4 models, short/long)
+
+The blogs are SYNTHETIC, generated locally in `blogrl/` (`run_all.sh` + `topics.py` +
+`generate_blogs.py`). Layout: `blogs/<category>/<topic>/<model>__<length>.md`. The corpus grew
+along THREE axes over the project — providers, categories, and topics-per-category — each
+expansion driven by a specific failure of the run before it.
+
+**Providers (the label space).** 4 generator models, collapsed to a **3-way** provider task:
+`claude-opus-4.8` (CLAUDE), `gpt-5.5` (CHATGPT), and two Gemini variants
+`gemini-3.1-pro-preview` + `gemini-3.5-flash` (merged → GEMINI). Lengths per (category, topic,
+model): **short** (~2500w / ~4k tok — fits the 16k RL window AND contrastive pairs), **long**
+(~5500w / ~9k tok — single-text prompts), **epic** (8–12k w — OVERFLOWS the 16k window, NOT used).
+
+**Axis 0 — the ORIGINAL 9 categories (binary HF `copilot-sdk-blogs`, 126 rows, claude/gpt only):**
+`cognitive-science-neuroscience`, `cybersecurity-infrastructure`, `deep-learning-ai`,
+`economics-systems`, `history`, `literature-cultural-theory`, `philosophy`, `politics`, `stem`.
+These are heavily technical/analytic in register. Val held out the **3 hardest** (lowest base
+pass@1): **history / politics / economics-systems**.
+
+**Why generate a local corpus at all.** The 126-row HF set was too small to RL-train on (P0.1).
+We needed thousands of balanced, verifiable rows ⇒ generate our own across many (category × topic
+× model × length) combos, resuming from disk so each expansion only fills the new combinations.
+
+**Axis 1 — providers expansion → fix the 4-way collapse.** Adding Gemini (pro + flash) gave a
+4-way eval that was **degenerate**: the base model predicted GEMINI-PRO ~91% regardless of input
+(P0.3). Motivation for the fix: collapse the two Gemini variants into one GEMINI and train on
+**provider-BALANCED** data (random 0.333; a constant-class strategy scores only 0.333), so the
+label-prior hack stops paying off.
+
+**Axis 2 — categories 9 → 21 → fix the held-out-category generalization gap.** RL val stayed
+capped because GEMINI style learned in the **technical-register** training categories did NOT
+transfer to the **argumentative/narrative** val categories (history / politics / economics-systems).
+So `topics.py` grew from **9 → 21 categories**, adding **12 humanities / social-science**
+categories deliberately **register-matched to the val set**, all landing in TRAIN (verbatim from
+`run_all.sh`: *"topics.py grew from 9 -> 21 categories … to fix the held-out-category
+generalization gap … the new categories are register-matched to the val set and all land in
+TRAIN"*). The 12 added: `sociology-anthropology`, `law-and-jurisprudence`, `art-architecture-design`,
+`religion-and-theology`, `linguistics-and-language`, `education-and-pedagogy`,
+`psychology-and-behavior`, `media-journalism-rhetoric`, `urban-environment-geography`,
+`business-strategy-management`, `medicine-public-health`, `music-and-performing-arts`.
+This is also what later enabled the **cross-register OOD val** (Part VI: separability that survives
+a register change).
+
+**Axis 3 — topics-per-category expansion.** Each category got a SECOND wave of topics appended to
+`topics.py` (each category now lists two topic blocks), bringing the total to **~630 topics
+(~30 / category)** for more within-category diversity (anti-memorization).
+
+**Generation timeline** (`blogrl/logs/run_all_*.log`): 2026-06-10 (first large local gen),
+2026-06-13, 2026-06-14 (the 9→21 diversity expansion). **Current scale: 21 categories, ~630
+topics, 4 models × {short, long} = 5258 `.md` files.**
+
+**Datasets derived from this corpus** (in `prime-rl/data/`, built by `build_blog_*.py`):
+`blog_author_id_v2` (180/90 binary, frontmatter-stripped) → `blog_author_id_3way` (411 = 137³ /
+204) → curriculum/contrastive/hardpair/balanced/pairwise/trio variants (Runs 2–15) →
+**`blog_author_id_3way_v2`** (train 2682 / val 414 / **val_ood 471** = the cross-register held-out
+set used by all the later SFT / cheatsheet / OPSD experiments). **Critical gotcha across every
+build:** local `.md` files begin with YAML frontmatter containing `model: <author>` — ALWAYS
+`strip_frontmatter()` before using as a prompt (the leak that faked val@0 = 0.906 in P0.2).
+
+---
+
+## Phase 0 — pre-3-way history (pass@4 baseline → binary RL → LR sweep → 4-way pass@k)
+
+
+> Backfilled 2026-06-25 from session checkpoints 001–003 and the SQL `runs`/`passk_runs`
+> tables. This is the work that PRECEDES Run 1: the original binary Claude-vs-ChatGPT
+> pass@4 analysis, the first RL runs, the LR sweep, and the 4-way degeneracy finding that
+> motivated the pivot to the provider-balanced 3-way task this log otherwise documents.
+
+### P0.1 — FIRST pass@4 baseline (binary CLAUDE vs CHATGPT, `copilot-sdk-blogs`)
+- Data: HF `copilot-sdk-blogs`, **126 rows**, balanced 63/63 (claude-opus-4.8 / gpt-5.5),
+  9 categories ×14, ~3128 words avg. Harness `blog-eval/src/eval.py` (8-GPU DP pass@4 scaffold;
+  max_tokens 16384, max_model_len 24576).
+- **Result: pass@1 = 56.0%, pass@2 = 77.5%, pass@4 = 94.4%. 0% parse-fail, 0% truncation.**
+- Per-row reward dist: **77.8% "mixed"** (1–3/4 correct ⇒ non-zero GRPO advantage), 16.7% solved,
+  5.6% all-wrong ⇒ near-ideal RL target (large pass@1→pass@4 headroom, clean verifiable reward).
+  Slight CLAUDE over-prediction. Caveat: 126 rows too small to train on directly.
+- Split: **val = 3 hardest categories held out entirely** (history / politics / economics-systems),
+  **train 84 / val 42**, balanced. Saved to `data/blog_author_id/{train,val}`.
+
+### P0.2 — FIRST RL run + binary LR sweep (CLAUDE vs CHATGPT)
+- Env: verifiers SingleTurnEnv, binary exact-match reward, SYSTEM_PROMPT with `<reason_why>`+
+  `<answer>` (no `<think>`). Trainer fixes that carried forward: `impl="hf"`,
+  `ac.mode="full"`, `fused_lm_head_token_chunk_size="auto"`, `max_model_len 16384`.
+- **First real RL run** (lr 1e-6, 7 steps = 1 epoch, batch 96 / group 8 = 12 prompts/step):
+  val pass@4 **0.452 → 0.558 mean / 0.625 peak**; train reward ~0.55; Error 0%, Truncation 0%.
+  Overfit sanity (4-sample) 0.28 → 0.72.
+- Eval-signal tuning: greedy val@0 0.610 vs noisy temp-1 mean 0.512, but greedy took 8m39s/step
+  ⇒ reverted to **temp-1 parity eval every step**.
+- **DATA-LEAKAGE bug** (user: "pass@1 is 90 wtf?"): local blog `.md` files have YAML frontmatter
+  with `model: <author>` → builder leaked the label → fake val@0 = 0.906. Fixed with
+  `strip_frontmatter()`; rebuilt clean **`data/blog_author_id_v2` (180 train / 90 val, 0 leaky)**.
+  Memory stored.
+- **Clean binary LR sweep** (v2 data; SQL `runs`): lr1e6 flat ~0.56; lr2e6 peak **0.642 @ step4**
+  → 0.489; lr3e6 peak **0.700 @ step4** (+0.15, best) → collapse ~0.52; lr5e6 immediate collapse.
+  Pattern: every LR peaks ~step 4 (⅓ epoch) then overshoots into class-collapse; higher LR =
+  higher/earlier peak + faster collapse. **Sweet spot lr ≈ 2–3e-6 + early-stop ~step 4.**
+
+### P0.3 — Multi-model pass@k (4-way degeneracy) → pivot to 3-way
+- 4-way pass@k (`blog-eval/src/eval_multimodel.py`, 8-GPU DP, keep/strip markdown):
+  **degenerate — predicts GEMINI-PRO ~91% regardless of input** (4404/4828 samples).
+  4-way pass@1 ≈ 0.25 (= random), collapsed-3-provider ≈ 0.49. Markdown barely matters (<0.01).
+  Per-model pass@1: gemini-pro 0.91, claude 0.05, gemini-flash 0.03, gpt 0.02. 0% parse-fail/trunc.
+- This label-bias collapse motivated the pivot to a **provider-BALANCED 3-way** task
+  (CLAUDE/CHATGPT/GEMINI, the two Gemini variants merged; random 0.333, "always GEMINI" only 0.333).
+  Built `data/blog_author_id_3way` (411 train 137/137/137, 204 val 68/68/68; short+long;
+  hard categories held out; body tokens ≤ 11800).
+
+### P0.4 — 3-way pass@4 baseline (the RL starting point; SQL `passk_runs`)
+- keep markdown: **pass@1 0.351 / pass@4 0.771**; strip: 0.360 / 0.769 (markdown not a tell).
+- Per-model pass@1: claude 0.18 (under-predicted), gpt 0.44, gemini-pro 0.41, gemini-flash 0.47.
+  Pred dist CLAUDE 328 / CHATGPT 1025 / GEMINI 1107 — **NOT collapsed** (unlike 4-way). 0 parse-fail/trunc.
+- This balanced 3-way split (random 0.333, base pass@1 ~0.35) is exactly where **Run 1 below picks up.**
+
+---
+
 ## Run history
 
 ### Run 1 — strict easy→hard curriculum  →  **COLLAPSED**
@@ -915,3 +1031,604 @@ E1 CONTROL (answer-only SFT on the SAME 1071 verifier-gated rows; reasoning stri
   rationale text and the gold-conditioning were BOTH non-essential; a small clean class-balanced
   labeled subset suffices and is OOD-robust. Confirms: this task's signal is a DENSE supervised
   label-mapping; RL-through-reasoning (sparse) is the mismatched tool. Artifact step_80 (1.000/1.000).
+
+================================================================================
+E2/E3 — OPCD + RLSD on-policy (self-)distillation: CODE BUILT, AWAIT LAUNCH
+================================================================================
+Status (2026-06-25): faithful experiment code built + validated WITHOUT GPUs; NOT launched
+(held for explicit go). Honest framing: E1/STaR above is verifier-gated hard-label SFT (the
+loose cousin), NOT a teacher-KL on-policy objective — so true OPD/OPSD had never been run.
+E2/E3 close that gap as NATIVE prime-rl training modes (not a standalone script).
+
+E2 — OPCD (On-Policy Context Distillation): student rolls out PLAIN; teacher = SAME policy with
+  the train-derived CHEATSHEET spliced into the system prompt, scores those rollouts. Loss =
+  detached per-token teacher/student logprob GAP as PG signal; DPPO trust region keyed to the
+  distillation direction (sign of teacher gap), not a verifier advantage. (opcd_loss_fn)
+E3 — RLSD (verifier-anchored on-policy self-distillation): per-token weight (P_T/P_S)^sign(A),
+  PPO/CISPO-clipped on the student ratio. Verifier gives DIRECTION (reinforce correct rollouts,
+  suppress incorrect), cheatsheet teacher gives MAGNITUDE; A==0 contributes nothing. (rlsd_loss_fn)
+
+Wiring: training_mode={"opcd","rlsd"} threaded through transport/config/dispatcher/orchestrator;
+  teacher-fetch gate uses TEACHER_LOGPROB_MODES; orchestrator splices the cheatsheet system-prefix
+  into the teacher prompt and realigns the returned logprobs to student sample length. Teacher =
+  the LIVE student inference pool (same weights, weight-broadcast each step) — most faithful
+  same-weights self-distillation and the only option with 4-train/4-infer on 8xH100. Port 8300.
+Init from BASE Qwen3.5-9B (feature-blind ~0.40) so the cheatsheet teacher (~0.66) is genuinely
+  better => non-degenerate signal (init from the 1.000 SFT would be uninformative by construction).
+Zero eval leakage: student rollouts + eval stay PLAIN; cheatsheet reaches the model ONLY via
+  teacher scoring.
+CAVEAT (in configs too): sampled-token, reverse-KL-flavoured (logprob gap on sampled tokens),
+  NOT full-vocabulary forward KL D_KL(p_T||p_S). Not claimed as forward-KL.
+
+Validation (no GPUs): opcd/rlsd loss fns registered + backprop-checked; splice + logprob-realign
+  unit tested (5/5 pass); splice identity cheat_prefix+plain_tail==cheat_prompt verified
+  token-for-token on 15 probe blogs (plain 399 -> cheat 621 tok, +222 cheatsheet tokens);
+  data/cheatsheet_splice_3way.json written; config validator now REQUIRES both teacher AND
+  cheatsheet_splice_path for opcd/rlsd (else teacher==student, empty signal); ruff clean.
+Pre-flight gate (run first, on go): scripts/diag_teacher_student.py — teacher-vs-student accuracy
+  / gold-label prob / label-space KL on val to confirm headroom before any 8xH100 run.
+Files: src/prime_rl/trainer/rl/loss.py (opcd_loss_fn, rlsd_loss_fn, setup_loss_fns);
+  src/prime_rl/orchestrator/{utils.py,orchestrator.py}; src/prime_rl/transport/types.py;
+  packages/prime-rl-configs/src/prime_rl/configs/orchestrator.py; scripts/build_cheatsheet_splice.py;
+  scripts/diag_teacher_student.py; examples/blog_author_id/rl_3way_{opcd,rlsd}.toml;
+  tests/unit/orchestrator/test_teacher_logprobs.py.
+
+================================================================================
+E2 — OPCD RESULT (RUN COMPLETE, 2026-06-25): transient gain -> truncation collapse
+================================================================================
+Launch: rl @ examples/blog_author_id/rl_3way_opcd.toml --output-dir outputs/opcd_e2
+  Qwen3.5-9B from BASE, 4 train (FSDP hf) + 4 infer (vLLM tp=2 dp=2), port 8300,
+  teacher=student pool w/ cheatsheet spliced in, max_steps=40, lr=1e-6, eval PLAIN every 4.
+Pre-flight gate (diag_teacher_student.py, n=60 val): teacher_acc 0.300 > student 0.250,
+  teacher gold_p 0.377 vs 0.284, label-KL 0.096, frac teacher>student 0.767 => GO (non-degenerate).
+
+VAL trajectory (PLAIN eval, group_size=2, 414 val):
+  Step  0  reward 0.2222  trunc 38.3%
+  Step  4  reward 0.2367  trunc 38.2%
+  Step  8  reward 0.2597  trunc 35.7%
+  Step 12  reward 0.2911  trunc 25.4%   <- PEAK (+0.069 abs / +31% rel over step 0)
+  Step 16  reward 0.2428  trunc 29.6%
+  Step 20  reward 0.1353  trunc 45.9%
+  Step 24  reward 0.0713  trunc 69.2%
+  Step 28  reward 0.0543  trunc 65.9%
+  Step 32  reward 0.0314  trunc 72.3%
+  Step 36  reward 0.0109  trunc 83.2%
+  Step 40  reward 0.0012  trunc 95.7%   <- COLLAPSE
+Train reward (teacher-gap PG) peaked ~0.375 (step 2) and got noisy/low later (trainable frac
+  fell to ~17-42%); off-policy stayed <=1.
+
+READING: OPCD briefly internalizes cheatsheet-conditioned behaviour (val +31% by step 12 as
+  truncation DROPS 38->25%), then runs away: the sampled reverse-KL gap keeps pushing the plain
+  policy toward longer cheatsheet-style reasoning it cannot terminate, truncation climbs
+  38->96% and reward collapses to ~0. No stable internalization; the distilled signal degenerates
+  into non-terminating reasoning. Consistent with the project-wide finding that the reasoning
+  channel is net-harmful for this task (SFT answer-only solves it; thinking hurts). A reverse-KL
+  sampled objective without a length/termination anchor is unstable here. Best (transient)
+  checkpoint would be ~step 12; final weights are degenerate and NOT worth pushing.
+  Honest caveat (as configured): sampled-token reverse-KL-flavoured, NOT full-vocab forward KL.
+
+OPS NOTE (disk): first launch CRASHED ~step 14 with OSError "No space left on device" (NOT GPU).
+  Cause: trainer maybe_clean() PRESERVES the ~18 GB weight-broadcast on every ckpt-interval step;
+  [ckpt] interval=4 over 40 steps retained 180 GB+ of broadcasts and filled the 2 TB disk (RPT
+  624 G + HF cache 362 G already resident). FIX: [ckpt] & [trainer.ckpt] interval=40 keep_last=1
+  (only the final broadcast/ckpt preserved; eval interval stays 4 for the curve). Re-run held
+  steady at ~36 G broadcasts. Same fix applied to rl_3way_rlsd.toml.
+
+================================================================================
+FULL-CORPUS pass@4 (BASE Qwen3.5-9B reference, 2026-06-25)
+================================================================================
+scripts/passk_fullcorpus.py — PLAIN 3-way prompt (thinking OFF, no cheatsheet), k=4,
+  temp 0.7 top_p 0.95 max_tokens 4096, vLLM tp=8, env SYSTEM_PROMPT_3WAY + _make_extractor
+  (zero leakage, same parser as RL eval). Model = BASE Qwen/Qwen3.5-9B (corpus learnability
+  reference; NOT a trained checkpoint). Results: blog-eval/results/passk_fullcorpus.json.
+
+  split     n     pass@1   pass@4 | CLAUDE p1/p4   CHATGPT p1/p4   GEMINI p1/p4
+  train    2682   0.3619   0.7987 | 0.2833/0.7159  0.3688/0.8221   0.4334/0.8579
+  val       414   0.3671   0.8116 | 0.2844/0.7319  0.3913/0.8188   0.4257/0.8841
+  val_ood   471   0.3381   0.7495 | 0.2118/0.5732  0.4188/0.8471   0.3838/0.8280
+  parse_fail ~0.0002, truncation ~0 across all splits (clean).
+  pred_dist (val): CLAUDE 349 / CHATGPT 637 / GEMINI 669 — model UNDER-predicts CLAUDE.
+
+INTERPRETATION:
+  * 3-way random at k=4 => pass@4 = 1-(2/3)^4 = 0.802, so pass@4 ~0.75-0.81 is NEAR the random
+    ceiling and NOT itself evidence of skill. pass@1 is the meaningful metric.
+  * pass@1 ~0.34-0.37 vs 0.333 chance => BASE is only marginally above feature-blind (matches the
+    prior "base ~0.40 forced-choice" probe). Weak but real signal: provider asymmetry is consistent
+    (GEMINI easiest ~0.38-0.43, CLAUDE hardest ~0.21-0.28) and the prediction distribution is
+    skewed (systematic CLAUDE under-prediction), i.e. not pure uniform guessing.
+  * val_ood is hardest (held-out categories): pass@1 0.338, and CLAUDE pass@4 only 0.573 — the
+    OOD CLAUDE rows are the single hardest cell.
+  * Baseline contextualizes the trained runs: SFT answer-only reaches val 1.000 (the signal IS
+    learnable from the text); BASE near-chance pass@1 shows it is NOT trivially present zero-shot;
+    OPCD/RL on the reasoning channel do not stably beat this (OPCD peaked val 0.291 then collapsed).
+
+================================================================================
+E3 — RLSD RESULT (RUN COMPLETE, 2026-06-25): best transient peak, then hard collapse
+================================================================================
+Launch: rl @ examples/blog_author_id/rl_3way_rlsd.toml --output-dir outputs/rlsd_e3
+  Qwen3.5-9B from BASE, 4 train + 4 infer (tp=2), port 8300, teacher=student pool w/ cheatsheet
+  spliced, max_steps=40, lr=1e-6, batch 144, eval PLAIN every 4. training_mode="rlsd":
+  per-token weight (P_T/P_S)^sign(A), PPO/CISPO-clipped on student ratio; verifier gives DIRECTION,
+  cheatsheet teacher gives MAGNITUDE, A==0 contributes nothing.
+
+VAL trajectory (PLAIN eval, 414 val):
+  Step  0  reward 0.2222  trunc 37.8%
+  Step  4  reward 0.2585  trunc 35.5%
+  Step  8  reward 0.2874  trunc 28.9%
+  Step 12  reward 0.4094  trunc  9.2%   <- PEAK (+0.187 abs / +84% rel over step 0; trunc 38->9%)
+  Step 16  reward 0.2983  trunc  8.6%
+  Step 20  reward 0.0024  trunc 98.6%   <- CLIFF
+  Step 24  reward 0.0000  trunc 100.0%
+  Step 28  reward 0.0000  trunc 100.0%
+  Step 32  reward 0.0000  trunc 100.0%
+  Step 36  reward 0.0000  trunc 100.0%
+  Step 40  reward 0.0000  trunc 100.0%
+Train reward went to 0.0 from step ~20 with trainable frac ~99-100% (every rollout truncated,
+  verifier reward 0) — the policy is fully degenerate (non-terminating) but still "on-policy".
+
+READING: RLSD is the STRONGEST reasoning-channel result we have at its peak — val 0.4094 at step 12
+  vs OPCD's 0.2911 and the BASE/plain eval 0.2222 — AND it is the only method that IMPROVED
+  termination (truncation 38%->9%) while improving accuracy. The verifier anchor (reinforce
+  correct, terminating rollouts; suppress incorrect) plus the cheatsheet teacher magnitude gives a
+  genuinely useful early signal: the distillation direction is RIGHT. But with no KL-to-base / no
+  length or entropy regularizer, the (P_T/P_S)^sign(A) weighting amplifies a degenerate mode and
+  the policy falls off a cliff between step 16 and 20 into 100% truncation (reward 0), even harder
+  than OPCD's gradual decay. Net: real but UNSTABLE; needs a trust-region/anchor to hold the peak.
+
+OPCD vs RLSD (both BASE-init, 40 steps, identical eval):
+  metric              base/step0   OPCD peak(s12)   RLSD peak(s12)   both final(s40)
+  val reward          0.2222       0.2911           0.4094           ~0.00
+  truncation          37.8%        25.4%            9.2%             ~100%
+  => RLSD peak >> OPCD peak; RLSD also fixes truncation (verifier direction). Both collapse w/o a
+  regularizer. Best (transient) checkpoint = RLSD step 12; final weights of BOTH are degenerate.
+
+WHY THE COLLAPSE (theory, both runs): the teacher/student logprob gap on SAMPLED tokens is a
+  reverse-KL-flavoured pull; reverse KL is mode-seeking and, unconstrained, collapses onto a
+  high-teacher-logprob mode. Here that mode is "keep emitting cheatsheet-style reasoning" which
+  never terminates within max_tokens => truncation -> 100%, verifier reward -> 0, and (RLSD) the
+  ratio weight keeps reinforcing it because A is computed before the gate. A forward-KL (full-vocab)
+  objective and/or an explicit length/termination penalty + KL-to-base trust region is the missing
+  ingredient. Consistent with the project finding: the reasoning channel is net-harmful here unless
+  tightly anchored; answer-only SFT (val 1.000) remains the only stable solver.
+
+================================================================================
+E3b — RLSD + TRUST-REGION ANCHOR: CODE BUILT + VALIDATED, QUEUED (2026-06-26)
+================================================================================
+Motivation: E3 RLSD peaked val 0.409 @s12 (trunc 38->9%) then cliffed to 100% truncation by s20.
+Test: does a TRUST REGION hold the peak? New native mode training_mode="rlsd_anchored"
+(rlsd_anchored_loss_fn) = RLSD signal + explicit per-step trust region. CLEAN ATTRIBUTION: only the
+loss-side anchor changes vs E3 (truncation penalty OFF, advantage default).
+
+Anchor (vs unanchored rlsd_loss_fn):
+  - clip_c 2.0 -> 1.0           (coef in [1/e, e] instead of [1/e^2, e^2])
+  - eps    0.2 -> 0.1           (tighter CISPO ratio clip)
+  - RATIO-based trust-region MASK keyed on update direction (sign of coef): drop tokens whose
+    trainer/rollout ratio already moved past 1 +/- 0.1 in the push direction. Original RLSD applied
+    coef to EVERY token, no guard. [rubber-duck fix: ratio band, NOT the absolute-prob threshold an
+    earlier draft used, which is blind at very low/high token probs]
+  - KL-to-rollout: proper k3 KL (mismatch_kl), beta 0.5, replacing the near-zero 1e-3*log_ratio^2.
+
+HONEST SCOPE (rubber-duck-reviewed): anchors to the BEHAVIOUR (rollout) policy mu, NOT a frozen base
+(prime-rl plumbs no reference model; LossInputs has only trainer/inference/teacher logprobs + adv +
+mask). => LOCAL per-step trust region: blocks the single-step explosion that caused the E3 cliff,
+but cannot by itself pin the policy to the s12 peak if mu drifts slowly. If it still collapses, THAT
+is the finding (a local anchor is insufficient; a frozen/best-ckpt reference or a length/termination
+penalty would be the next lever). PG sign verified correct (coef>0 pushes prob up, <0 down; A==0 ->
+0); k3 KL gradient (importance_ratio - 1) is NOT detached, correctly opposes drift.
+
+Plumbing: training_mode "rlsd_anchored" added to transport/types.py (TrainingMode + TEACHER_LOGPROB_
+MODES), orchestrator/dispatcher.py, configs/orchestrator.py (Literal + the teacher/cheatsheet
+validators). loss.py: rlsd_anchored_loss_fn + setup_loss_fns dispatch. Config
+examples/blog_author_id/rl_3way_rlsd_anchored.toml (output-dir outputs/rlsd_anchored_e3b). Validated:
+py_compile OK; OrchestratorConfig(**toml) builds with mode=rlsd_anchored; loss fwd/backward finite,
+A==0 coef==0, high-ratio push-up token correctly masked.
+
+STATUS: QUEUED — awaiting a free 8xH100 (box currently running the RPT continued-pretraining job;
+will not interfere). Launch when free:
+  uv run rl @ examples/blog_author_id/rl_3way_rlsd_anchored.toml --output-dir outputs/rlsd_anchored_e3b
+
+--------------------------------------------------------------------------------
+E3b — RLSD + TRUST-REGION ANCHOR: RAN (2026-06-26). FINDING: STABILISED, NO GAIN.
+--------------------------------------------------------------------------------
+BASE-init, 40 steps, eval interval 4, identical PLAIN val eval as OPCD/RLSD. Full trajectory
+(val reward = accuracy / truncation %):
+  step:   0      4      8      12     16     20     24     28     32     36     40
+  val:   0.214  0.211  0.198  0.213  0.181  0.185  0.197  0.248* 0.234  0.225  0.228
+  trunc%: 37.1   40.6   48.8   47.9   55.1   56.6   57.0   47.7   46.6   47.5   44.2
+  (* best val 0.2476 @ s28; best-step train reward stayed flat 0.28-0.34 throughout, no collapse)
+
+RESULT: the trust region DID ITS JOB on stability and ONLY that. Contrast with E3 (RLSD):
+  metric            BASE/s0   RLSD(E3) peak   RLSD(E3) final   RLSD-ANCHORED(E3b)
+  val peak          0.2222    0.4094 (s12)    0.000 (s20+)     0.2476 (s28)
+  truncation        ~38%      9% (s12)        100% (s20+)      37->57->44% (bounded)
+  collapse?         --        HARD cliff s16->20 to 100% trunc  NONE (never > 57%)
+  => E3b NEVER collapses (truncation bounded 37-57%, recedes to 44% by end) BUT never gains:
+     val hovers in a flat 0.18-0.25 band, indistinguishable from the BASE/step-0 baseline.
+
+READING (confirms the rubber-duck hypothesis exactly): anchoring to the BEHAVIOUR policy mu damps
+  out BOTH the E3 truncation runaway AND the transient s12=0.409 peak. The s12 spike in E3 was an
+  unstable excursion off mu; a per-step trust region that pins the policy near mu necessarily
+  prevents that excursion in either direction. Net: the local anchor removes the downside (collapse)
+  and the upside (peak) together -> flat, no-learning. As predicted, a mu-anchor CANNOT pin the
+  policy to a peak that mu itself never holds. To capture the RLSD early signal you need a NON-moving
+  reference (frozen base / best-ckpt EMA) or an explicit length/termination penalty + best-ckpt
+  selection -- NOT a local trust region. E3b is the clean negative control that establishes this.
+
+DISK: post-run reclaimed weights+broadcasts+rollouts (~55G); kept launch.log/logs/wandb summary.
+
+================================================================================
+E-LEX — PLAIN GRPO + HINT-FREE LEXICAL (TF-IDF) PROMPT: RUNNING (2026-06-26)
+================================================================================
+Motivation (user): keep the RL VANILLA -- CONTROL settings DPPO + Dr.GRPO (default DPPO+KL loss,
+NO override = dppo_mask 0.2/0.2; default Dr.GRPO advantage; no teacher / no cheatsheet / no shaping)
+-- and change ONLY the system prompt to a lexical-correlation (TF-IDF-style) one that tells the model
+to weigh the most DISCRIMINATIVE tokens (high term-freq for one provider, rare in the others). Tests
+whether STEERING the reasoning toward concrete lexical fingerprints (vs the generic holistic "judge
+HOW it's written") lets plain RL climb above the ~0.36 feature-blind pass@1 / 0.222 plain-eval floor.
+
+KEY DESIGN (user constraint): the prompt does NOT reveal which tokens map to which provider and gives
+NO example words -- it explicitly says "you are NOT told which tokens belong to which provider ...
+you must infer those associations entirely on your own". RL must DISCOVER the word<->provider
+correlations itself; the prompt only directs attention to surface form (word/phrase choice,
+punctuation, formatting) over topic. Identical to the CONTROL run (rl_3way_div_default) except
+prompt_variant="lexical". Reasoning ON (require_reason, min_reason_words=12); same PLAIN val eval
+(temp 0.7) as OPCD/RLSD/E3b for direct comparability. Config examples/blog_author_id/rl_3way_lexical.toml
+(output-dir outputs/lexical_elex). STATUS: launched, healthy (eval@0 in progress). Results below.
+
+--------------------------------------------------------------------------------
+E-LEX — RAN (2026-06-26). FINDING: FIRST CLEAN (no-teacher) RUN WITH A SUSTAINED CLIMB, NO COLLAPSE.
+--------------------------------------------------------------------------------
+BASE-init, 40 steps, eval interval 4. Eval uses the SAME lexical prompt (prompt_variant=lexical) at
+PLAIN temp 0.7. Full trajectory (val reward = accuracy / truncation %):
+  step:   0      4      8      12     16     20     24     28     32     36     40
+  val:   0.137  0.124  0.109  0.109  0.132  0.163  0.203  0.239  0.239  0.251  0.262*
+  trunc%: 44.8   47.0   49.3   50.7   43.0   33.0   31.0   27.4   33.5   30.0   26.2
+  (* best = FINAL, s40 0.2621, and the slope is still POSITIVE -- not plateaued)
+  train reward climbed in parallel (~0.31 early steps; trainable 100%, train-temp truncation 0%).
+
+SHAPE: a U with a strong recovery. s0 starts BELOW the generic-prompt baseline (lexical BASE 0.137 vs
+generic plain-eval 0.222) -- the more demanding lexical prompt CONFUSES the untrained BASE -- dips to
+a trough 0.109 @ s8-12, then RL learns to EXPLOIT the lexical framing: a monotonic climb 0.109 -> 0.262
+across s12->s40 while truncation FALLS 51% -> 26%. By s40 it is above the generic plain-eval baseline
+(0.262 > 0.222) and still rising.
+
+WHY THIS IS THE STANDOUT RESULT: across every reasoning-channel method tried (trio, entropy-decay,
+PVG variants, OPCD, RLSD, RLSD-anchored) this is the FIRST run that is simultaneously (a) CLEAN -- no
+teacher, no cheatsheet, no advantage shaping, no custom loss; pure CONTROL DPPO + Dr.GRPO -- and (b)
+shows a SUSTAINED, non-collapsing productive trajectory (accuracy up AND truncation down through the
+final step). OPCD/RLSD gained only transiently then cliffed; E3b was flat; the trio runs plateaued or
+collapsed. The ONLY thing changed here vs the collapsing control is the PROMPT: steering the model to
+hunt discriminative lexical tokens (and -- per user constraint -- WITHOUT being told which tokens map
+to which provider; it must infer the correlations itself) gives the verifier reward a learnable
+gradient that does not run away into truncation.
+
+HONEST CAVEATS:
+  - Absolute number is still MODEST: 0.262 single-sample val, far below answer-only SFT (val 1.000)
+    and below generic pass@4 (0.367). The win is the TRAJECTORY/STABILITY, not a new SOTA accuracy.
+  - The eval prompt differs from the OPCD/RLSD/E3b/pass@4 baselines (those use the GENERIC prompt),
+    so cross-config s0 numbers are NOT apples-to-apples at the prompt level. The clean within-run
+    statement is: under its OWN prompt, RL took BASE 0.137 -> 0.262 (~1.9x) with truncation halved.
+    The clean cross-config statement is: lexical-RL s40 0.262 edges the generic plain-eval 0.222, and
+    is the only clean run still trending UP at step 40.
+  - 3-way chance = 0.333; 0.262 is below chance on raw accuracy, consistent with the model
+    UNDER-using the answer slot early (truncation 26-50%); the signal is the slope + truncation drop.
+  - Zero-shot lexical pass@4 baseline (BASE, lexical prompt, full corpus) launched alongside to
+    isolate the prompt effect vs the 0.367 generic pass@4 -- results appended below when done.
+
+NEXT LEVER (if pursued): E-LEX had not plateaued at s40 -> run LONGER (80-120 steps) and/or add
+best-ckpt selection; the positive, non-collapsing slope is the first evidence that a PROMPT change
+(not a loss/teacher change) is what unlocks productive reasoning-channel RL here.
+
+ZERO-SHOT LEXICAL pass@4 (BASE, lexical prompt, full corpus, k=4, temp 0.7, max_tokens 4096, tp=8):
+  split     pass1    pass4    | generic-prompt pass1/pass4 (prior)   delta pass1
+  train     0.3499   0.8016   | 0.362 / 0.799                        -0.012
+  val       0.3400   0.7826   | 0.367 / 0.812                        -0.027
+  val_ood   0.3519   0.8025   | 0.338 / 0.749                        +0.014
+  per-provider (val): CLAUDE 0.221/0.601  CHATGPT 0.444/0.899  GEMINI 0.355/0.848
+  (truncation ~0% here -- standalone vLLM harness; same CLAUDE-hardest/CHATGPT-easiest ordering)
+
+READING: the lexical prompt does NOT help the UNTRAINED BASE zero-shot -- pass@1 and pass@4 are
+basically tied with the generic prompt (val even slightly LOWER: 0.340 vs 0.367 pass1, 0.783 vs 0.812
+pass4). So E-LEX's climb is NOT the prompt handing the model free accuracy; it is RL LEARNING to use
+the lexical framing. The prompt provides a better SURFACE TO LEARN ON (a structured "find
+discriminative tokens" objective the verifier gradient can act on), even though it is initially
+neutral-to-slightly-worse. This is the clean version of the result: prompt-alone ~ 0; prompt + RL =
+the only sustained non-collapsing climb. HARNESS CAVEAT (important): standalone pass@k truncates ~0%
+whereas the RL-orchestrator eval truncates ~38-45% at step 0 (a known, consistent harness gap that
+also affects the generic baselines) -- so the RL-harness E-LEX s0 (0.137) and this standalone lexical
+pass1 (0.340) are NOT the same measurement; compare lexical-vs-generic WITHIN each harness only.
+Result file: blog-eval/results/passk_fullcorpus_lexical.json.
+
+--------------------------------------------------------------------------------
+E-LEX-LONG — RAN (2026-06-27). KEY FINDING: THE 40-STEP CLIMB DID NOT REPRODUCE (variance).
+--------------------------------------------------------------------------------
+Identical config to E-LEX (plain GRPO, control DPPO+Dr.GRPO, lexical hint-free prompt, BASE init)
+EXCEPT max_steps 40 -> 100 (and ckpt interval 40 -> 100 for disk). Goal: does the E-LEX climb
+(0.137 -> 0.262, still rising @s40) continue, plateau, or collapse at a longer horizon?
+
+Full val trajectory (reward = accuracy / truncation %), eval every 4:
+  s0  0.126/48   s4  0.110/50   s8  0.092/56   s12 0.089/55   s16 0.091/61   s20 0.099/60
+  s24 0.074/62   s28 0.069/62   s32 0.063/66   s36 0.091/70   s40 0.073/68   s44 0.080/70
+  s48 0.065/72   s52 0.073/72   s56 0.080/76   s60 0.094/77*  s64 0.117/72   s68 0.117/64
+  s72 0.129/58   s76 0.146/55^  s80 0.132/54   s84 0.111/52   s88 0.101/45   s92 0.066/46
+  s96 0.040/40   s100 0.041/39
+  (* truncation peak ~77% @s56-60;  ^ best val 0.146 @s76 -- far below E-LEX's 0.262 @s40)
+
+THE RESULT IS A NON-REPRODUCTION. Same config, reseeded (rollout sampling temp 1.0 + async
+off-policy dispatch are stochastic even with PRIME_RL_PRESERVE_DATA_ORDER=1), gives the OPPOSITE
+shape to the 40-step E-LEX:
+  metric                E-LEX (40-step)        E-LEX-LONG (100-step)
+  s0 val                0.137                  0.126           (~same start)
+  s40 val               0.262 (climbing)       0.073           (drifted DOWN)
+  best val              0.262 (@s40, the end)  0.146 (@s76, a transient wobble)
+  s40 truncation        26% (falling)          68% (rising)
+  final val             0.262                  0.041
+  shape                 monotonic CLIMB        truncation DRIFT up to ~77%, low accuracy throughout,
+                                               one transient partial recovery (s64-80), then decays
+
+HONEST REVISION of the E-LEX writeup: the earlier "first clean run with a SUSTAINED climb / standout
+result" claim DOES NOT HOLD UP. The 40-step climb was a FAVORABLE STOCHASTIC EXCURSION, not a stable
+property of plain-RL + lexical-prompt. A reseeded identical run does not reproduce it; instead it
+shows the SAME truncation-drift fragility as every other reasoning-channel method here (OPCD, RLSD,
+trio, PVG). Run-to-run variance DOMINATES the effect of the lexical prompt at this scale/recipe. The
+correct conclusion is the conservative one consistent with the whole project: the reasoning channel
+is NOT a reliable lever for this task under plain GRPO; answer-only SFT (val 1.000) remains the only
+stable solver. The lexical prompt neither reliably helps (zero-shot pass@4 ~ generic; see prior
+entry) nor reliably trains (40-step up, 100-step down).
+
+METHODOLOGICAL NOTE: a single 40-step RL curve is NOT sufficient evidence of a "trend" on this task
+given the observed variance -- future reasoning-channel claims need >=2-3 seeds before any climb is
+called real. E-LEX-LONG is the seed that refutes the single-seed optimism.
+
+DISK: post-run reclaimed weights+broadcasts+rollouts; 93G free. Config
+examples/blog_author_id/rl_3way_lexical_long.toml.
+
+================================================================================
+COLD-START ABLATION (SFT warm-up -> reasoning RL) — RAN 2026-06-27
+================================================================================
+MOTIVATION. Every reasoning-channel RL run in this project so far was initialised from the
+BASE Qwen3.5-9B and started near chance (val ~0.13-0.21) with truncation that drifts to ~100%
+(OPCD, RLSD, trio, PVG, E-LEX-LONG). Hypothesis: the collapse is a COLD-START pathology — the
+base model cannot yet produce a well-formed bounded <reason_why>/<answer> trace, so RL optimises
+into degenerate long/truncated generations before it can find signal. Fix: give RL a competent
+starting policy via a short SFT warm-up on verified reasoning traces, THEN run the SAME control RL.
+
+RECIPE (two phases, all 8 GPUs, one at a time):
+  Phase 1 — sft_coldstart.toml: 60-step SFT from BASE Qwen3.5-9B on data/blog_sft_star_e1_trunc
+    (1071 STaR self-distilled traces that PASSED the verifier; system prompt == env
+    SYSTEM_PROMPT_3WAY exactly, assistant in <reason_why>...</reason_why><answer>...</answer>).
+    lr 1e-5, warmup 10, max_steps 60. Loss converged ~0.74. Saved weights/step_60 (HF-loadable).
+    NOTE: trainer weight-save omits the multimodal processor files (Qwen3.5-9B is a VLM); had to
+    copy preprocessor_config.json / video_preprocessor_config.json / merges.txt / vocab.json from
+    the base snapshot into step_60 so vLLM + hf trainer could load the local path.
+  Phase 2 — rl_3way_coldstart.toml: generic reasoning GRPO, CONTROL settings (DPPO + Dr.GRPO,
+    no teacher, no cheatsheet, hint-free generic SYSTEM_PROMPT_3WAY, require_reason min 12 words),
+    init from outputs/coldstart_sft/weights/step_60, max_steps 40, eval every 4, port 8300.
+
+FULL val trajectory (reward = accuracy / truncation %), eval every 4 steps:
+  s0  0.670/0   s4  0.666/0   s8  0.704/0   s12 0.743/0   s16 0.771/0   s20 0.767/0
+  s24 0.773/0   s28 0.826/0   s32 0.819/0   s36 0.882/0   s40 0.895/0
+  TRUNCATION = 0.0% at EVERY eval and EVERY train step. Error 0.0%. Turns 1.0.
+
+RESULT — THIS IS THE HEADLINE. Cold-start turns reasoning RL from "collapses every time" into a
+clean, near-monotonic CLIMB that NEVER collapses:
+  metric                BASE-init reasoning RL (OPCD/RLSD/E-LEX-LONG)   COLD-START (this run)
+  s0 val                ~0.13-0.21                                      0.670
+  s0 truncation         high & rising                                   0.0%
+  trajectory            truncation drifts to 60-100%, val sinks         val climbs 0.670 -> 0.895
+  truncation @ end      ~40-100%                                        0.0%
+  collapse?             YES (every seed)                                NO
+The 60-step SFT warm-up both (a) lifts the starting policy to 0.67 @ 0% truncation and (b) removes
+the truncation-drift failure mode entirely — confirming the collapse was a cold-start pathology,
+not an intrinsic property of the reasoning channel under plain GRPO. Best val 0.895 @ s40, still
+rising at the horizon.
+
+CAVEATS (honest, per the E-LEX-LONG lesson on single-seed optimism):
+  - SINGLE SEED. The evidence here is far stronger than E-LEX's single excursion (11 consecutive
+    evals, monotone-ish climb, 0% truncation throughout — not one lucky point), but a 2nd seed
+    would confirm reproducibility before calling the +0.22 climb a stable slope.
+  - STILL BELOW answer-only SFT (val 1.000). Cold-start RL reaches 0.895; it does NOT beat the
+    answer-only solver. Its value is SCIENTIFIC: it isolates *why* reasoning-channel RL collapsed
+    (cold start) and shows a warm start fixes the dynamics, not that reasoning > answer-only.
+  - The Phase-2 gain rides on the SFT prior; how much is RL vs. residual SFT drift is not separated
+    here (the SFT-60 itself starts Phase 2 at 0.67).
+
+DISK: post-run reclaimed coldstart_rl weights+broadcasts+rollouts (68G free). Kept
+outputs/coldstart_sft/weights/step_60 (the warm-start checkpoint). Configs:
+examples/blog_author_id/sft_coldstart.toml + rl_3way_coldstart.toml.
+
+================================================================================
+ALL-MODELS TRACE INFERENCE (val + val_ood, plain prompt) — RAN 2026-06-27
+================================================================================
+Downloaded each of the 6 pushed Hub finetunes (CK0607/qwen3.5-9b-blogprovider-*), ran inference
+on the FULL val (414) + val_ood (471) sets with the PLAIN generic SYSTEM_PROMPT_3WAY (comparable
+across models), stored per-model JSONL traces + summary.json under blog-eval/traces/<model>/, then
+deleted the weights. Hub finetunes lack a chat_template -> rendered with the base Qwen3.5-9B
+template (identical vocab). One model per process, tp=8.
+
+  model                          val acc   val_ood acc   notes
+  sft-goldcond                   1.000     1.000         answer-only solver, 0% trunc
+  selfgated-answeronly           1.000     1.000         answer-only solver, 0% trunc
+  star-selfdistill               0.952     0.960         reasoning SFT, 0% trunc, ~balanced preds
+  rl-cheatsheet                  0.372     0.374         collapsed to mostly-CLAUDE, ~1-2% trunc
+  rl-entropydecay                0.290     0.304         collapsed to mostly-GEMINI, ~12% trunc
+  rl-pureacc-peak                0.384     0.382         collapsed to mostly-CHATGPT, 0% trunc
+
+Confirms the standing picture on held-out data: the two answer-only SFT models generalise perfectly
+(1.000 on both val and the OOD split); STaR reasoning SFT is close (~0.95-0.96); and all three
+reasoning-channel RL checkpoints sit near/below chance with degenerate single-class prediction
+collapse. Traces archived at blog-eval/traces/. (This is the BASE-init RL collapse that the
+cold-start ablation above fixes.)
+
+================================================================================
+PROVIDER WRITING-STYLE ANALYSIS (semantic vs stylometric) — 2026-06-27
+================================================================================
+Built scripts/provider_semantic_viz.py: embeds every val/val_ood blog two ways and runs a linear
+probe (LogReg, fit on train) to test the project's core claim (style not topic; densely separable).
+
+LINEAR-PROBE 3-way accuracy (fit on train, eval held-out):
+  representation                 val      val_ood
+  semantic embedding (MiniLM)    0.811    0.849     <- content leaks SOME style but confusable
+  stylometric (~40 feats)        1.000    1.000     <- PERFECT separation, incl. OOD topics
+=> the task IS a dense, linearly-separable STYLE map. Same 1.000 ceiling as answer-only SFT; no
+   reasoning headroom -> explains why reasoning-channel RL matched the ceiling or collapsed.
+
+PER-PROVIDER mean style (the giveaways):
+  feature                CLAUDE   CHATGPT  GEMINI
+  em-dash rate           1.89     0.10     0.59     (Claude ~19x ChatGPT -- top single feature)
+  avg sentence len (w)   20.5     13.0     18.9
+  bold ** rate           2.07     0.61     1.86
+  ##/### header rate     0.52     0.94     0.68
+  LaTeX rate             2.29     2.48     4.14
+  ASCII-diagram rate     0.06     0.06     4.99     (Gemini ~80x -- top single feature)
+  md-table rate          0.07     0.29     0.84
+  however/furthermore    low      low      high
+  CLAUDE  = essayistic (long sentences, em-dashes, semicolons, bold, first-person argument)
+  CHATGPT = structured/pedagogical (short sentences, ## headers, worked examples, questions)
+  GEMINI  = visual/explanatory (ASCII diagrams, tables, LaTeX, connective markers, "we" voice)
+
+CORROBORATION: matches the model-derived fingerprints harvested from correct <reason_why> rollouts
+(run12/run15e: Claude "essayistic/nuanced/em-dash" up to 10x lift; ChatGPT "worked example/numbered/
+LaTeX"; Gemini "ascii 7.5x / diagrams 6.8x / confident narrative"). The models learned the REAL
+stylometric signature, not a shortcut; "reasoning" is post-hoc rationalisation of a style-determined
+decision -> why supervising rationales (STaR 0.95) < answer-only (1.000).
+
+Artifacts: blog-eval/analysis/{provider_umap,style_separation,provider_confusion}.png +
+analysis_summary.json. Pushed to dataset CK0607/qwen3.5-9b-blogprovider-traces.
+
+================================================================================
+FULL RUN LADDER (every run: change, result, wandb + HF links) — 2026-06-27
+================================================================================
+W&B entity ChinmayK0604 / project blog-author-id-rl (offline runs synced post-hoc). Checkpoints
+public under hf.co/CK0607; traces in dataset CK0607/qwen3.5-9b-blogprovider-traces.
+
+| Run | What changed | Key result (val / val_ood) | W&B | HF ckpt | HF traces |
+|---|---|---|---|---|---|
+| **SFT — gold-conditioned** | SFT distilling gold-label-conditioned teacher rationales onto plain prompt (2892 balanced) | val **1.000** / ood **1.000** | — | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-sft-goldcond) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-sft-goldcond) |
+| **SFT — answer-only (self-gated)** | Answer-only SFT on 1071 verifier-gated self-rollouts; rationale stripped | val **1.000** / ood **1.000** (beats STaR) | — | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-selfgated-answeronly) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-selfgated-answeronly) |
+| **SFT — STaR self-distill** | On-policy STaR; supervise model's OWN verifier-gated <reason_why> | val 0.952 / ood 0.960 | — | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-star-selfdistill) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-star-selfdistill) |
+| grpo-thinkoff (baseline) | First GRPO, thinking off, 3-way | early baseline; sub-SFT | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/83bc29b237884b86bb813438827e7503) | — | — |
+| div-default (control) | Control DPPO + Dr.GRPO, generic prompt, topic-diverse data | plateaus ~0.40 (reasoning ceiling) | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/0tnz73pq) | — | — |
+| div-entropy | + entropy bonus on the control | no gain over control | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/oyje2fq2) | — | — |
+| curriculum / interleaved | Topic-curriculum & interleaved orderings | no durable gain | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/rguqxbgn) | — | — |
+| contrastive / pairwise / hardpair | Pair-mining data variants (hard provider pairs) | no durable gain | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/0aq5vwk2) | — | — |
+| pvg-entropy | Prover-verifier-game style + entropy | no durable gain | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/y3sb9g8m) | — | — |
+| **RL — cheatsheet (trio)** | GRPO w/ train-style cheatsheet in context, trio curriculum | cheatsheet-free ~0.40; plain **0.372/0.374** | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/c8os8n8z) | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-rl-cheatsheet) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-rl-cheatsheet) |
+| **RL — entropy-decay** | Entropy-decay schedule ablation (final ckpt) | negative ablation; plain **0.290/0.304** | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/c8os8n8z) | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-rl-entropydecay) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-rl-entropydecay) |
+| **RL — pure-accuracy (peak)** | Answer-only / no-reasoning GRPO (reward=label match), peak step_16 | peaked 0.65 then collapsed; plain **0.384/0.382** | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/b1v5cru5) | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-rl-pureacc-peak) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-rl-pureacc-peak) |
+| **OPCD (E2)** | On-policy context distillation; cheatsheet teacher → plain student | re-run reproduced: peak ~0.27 (s8) → truncation-collapse; final ckpt val/ood **0.03/0.02** (96% trunc) | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/4dywekt0) | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-opcd-e2) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-opcd-e2) |
+| **RLSD (E3)** | Verifier-anchored self-distillation (sign×teacher-gap, PPO-clip) | re-run reproduced: peak ~0.35 (s12, trunc↓17%) → collapse; final ckpt val/ood **0.00/0.00** (100% trunc) | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/h485ltix) | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-rlsd-e3) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/qwen3.5-9b-blogprovider-rlsd-e3) |
+| RLSD-E3b (trust-region anchor) | + KL trust-region anchor on RLSD | collapse PREVENTED but gain killed (flat 0.18–0.25) | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/14zovr5c) | — | (weights not retained) |
+| E-LEX (lexical, 40-step) | Hint-free lexical/style prompt, control GRPO, base init | 0.137→0.262 climb (single-seed, NOT reproduced) | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/rvlk8sgr) | — | (weights not retained) |
+| E-LEX-LONG (lexical, 100-step) | Same, 100 steps — reseed | REFUTES climb: →0.041, trunc ~77% | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/brn85thu) | — | (weights not retained) |
+| **Cold-start SFT (Phase 1)** | 60-step SFT warm-up on STaR traces (the RL init) | val 0.696 / ood 0.682 | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/92svhbn0) | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-coldstart-sft) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/coldstart-sft) |
+| **Cold-start RL (Phase 2) ★** | Control GRPO from SFT-60 (the headline) | **0.67→0.90, 0% trunc, NO collapse**; plain **0.911/0.919** | [wandb](https://wandb.ai/ChinmayK0604/blog-author-id-rl/runs/92svhbn0) | [ckpt](https://huggingface.co/CK0607/qwen3.5-9b-blogprovider-coldstart-rl) | [traces](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces/tree/main/coldstart-rl) |
+
+NOTES: Cold-start RL (star) = only reasoning-channel run that climbs + never collapses; reproduced
+2 seeds (0.670->0.895, 0.652->0.905, both 0% trunc). RLSD-E3b / E-LEX / E-LEX-LONG = weights NOT
+retained (reclaimed for disk); curves in W&B + log narrative. RLSD-E3 + OPCD-E2 re-run from scratch
+to regenerate pushable checkpoints (2026-06-27).
+
+## Part XVI — What each training method actually learned (trace-level prose analysis)
+
+Parts XIV–XV established *what separates the providers* (stylometry) and *how each run scored*. This
+part reads the **reasoning prose itself** — the `<reason_why>` text in every model's val traces — to
+answer a different question: **what did each training method teach the model to *notice and say*?**
+
+**Method.** `scripts/analyze_trace_quirks.py` parses the `<reason_why>` of all 414 val traces per
+model. For each model it (a) measures prose stats (median length, fraction of rationales that name at
+least one *concrete* measurable surface feature vs. pure vibes, fraction that are over-confident vs.
+hedged), (b) tallies which surface features the prose points at (em-dash, headers, tables, ASCII
+diagrams, lists, intensifiers, transitions, …), and (c) extracts representative verbatim rationales
+per provider on **correct** predictions. Output: `blog-eval/analysis/trace_quirks.json`.
+
+### XVI.1 — The shared "tell vocabulary" every healthy model converged on
+
+Independently of the training recipe, every model that reasons coherently (SFT-goldcond, STaR,
+cold-start RL, cold-start SFT, pure-accuracy peak) describes the **same three style signatures** — and
+they line up exactly with the stylometric discriminators from Part XIV. Verbatim, from
+`sft-goldcond` (val, correct):
+
+> **CLAUDE →** *"…distinctively Claude-style markers, including the use of sincerity adverbs like
+> 'genuinely,' 'honestly,' and 'precisely,' alongside essayistic phrasing… The voice is warm and
+> argument-driven, employing second-person address ('you')… over the hedging or enumerative style
+> typical of ChatGPT or the grandiose formalism of Gemini."*
+
+> **CHATGPT →** *"…the distinctively hedging, enumerative style of ChatGPT, characterized by frequent
+> phrases like 'may be,' 'can also,' and 'for example'… The structure relies heavily on explicit
+> lists, numbered steps, and formal definitions (e.g., $E_i = P_i \times B_i$)…"*
+
+> **GEMINI →** *"…Gemini's distinct formal register through heavy use of intensifiers like 'profound,'
+> 'fundamentally,' and 'massive,' alongside a confident, declarative tone that avoids hedging. Its
+> structure relies on complex mathematical formalization and ASCII diagrams…"*
+
+So the model learned the **real** discriminators — Claude's em-dash/sincerity/second-person essay
+voice, ChatGPT's hedged enumerated headers, Gemini's intensifier-laden ASCII/LaTeX density — the very
+features the linear probe in Part XIV separates perfectly. The reasoning is a faithful natural-language
+read-out of the stylometric signal, **not** topic/content (which Part XIV showed is intermixed).
+
+### XVI.2 — Training recipe shapes the *character* of the reasoning
+
+The same tell vocabulary is delivered very differently depending on how the channel was trained:
+
+| Model (training) | val acc | median reason | concrete¹ | confident² | hedged² | pred distribution (collapse?) |
+|---|---|---|---|---|---|---|
+| `sft-goldcond` (gold-conditioned SFT) | 1.000 | 73 w | 0.98 | 0.35 | 0.14 | balanced 138/138/138 |
+| `star-selfdistill` (STaR self-distill) | 0.952 | 82 w | 0.98 | 0.57 | 0.07 | balanced |
+| `coldstart-rl` (SFT-60 → control GRPO) | 0.911 | 81 w | 1.00 | 0.36 | 0.06 | balanced |
+| `coldstart-sft` (60-step SFT only) | 0.696 | 85 w | 0.99 | 0.46 | 0.07 | balanced |
+| `rl-pureacc-peak` (pure-accuracy GRPO) | 0.384 | 91 w | 0.98 | **0.74** | 0.07 | **CHATGPT 336/414** |
+| `rl-cheatsheet` (cheatsheet GRPO) | 0.372 | **15 w** | 0.33 | 0.07 | 0.01 | **CLAUDE 342/414** |
+| `rl-entropydecay` (entropy-decay GRPO) | 0.290 | 23 w | 0.50 | 0.04 | 0.01 | **GEMINI 346/414** |
+| `rlsd-e3` / `opcd-e2` (distillation, collapsed) | ~0.00 | **2000+ w**³ | 0.10 | 0.00 | 0.70 | 100% truncation |
+
+¹ fraction of rationales naming ≥1 measurable surface feature. ² confident/hedged lexical markers.
+³ un-terminated runaway text — the tag never closes.
+
+**Reading the table:**
+
+- **SFT (gold-conditioned & STaR) — the gold standard of *grounded* reasoning.** Compact (73–82 w),
+  near-100% concrete, balanced across providers. STaR self-distillation makes the prose noticeably
+  **more assertive** (confident 0.57 vs SFT's 0.35) while staying accurate — it learned to commit to a
+  call. This is the prose that earns 0.95–1.00.
+
+- **Cold-start RL — keeps SFT's grounding and stays balanced.** It inherits the concrete, balanced
+  reasoning of its SFT-60 init (concrete 1.00, balanced predictions) and never collapses — consistent
+  with its 0% truncation. RL here *polishes* the SFT reasoning rather than rewriting it. Example
+  (GEMINI, correct): *"…relies heavily on mathematical formalism (using LaTeX equations like
+  $\Phi: \mathcal{D}_{\text{Source}} \to \mathcal{D}_{\text{Target}}$) and ASCII diagrams… a distinct
+  stylistic trait of Gemini."*
+
+- **Pure-accuracy RL — concrete but over-confident and mode-collapsed.** Rationales stay long and
+  feature-naming (concrete 0.98), but confidence jumps to **0.74** (the highest of any model) while
+  accuracy *falls* to 0.38 because predictions **collapse onto CHATGPT (336/414)**. It learned to write
+  a fluent, self-assured ChatGPT-justification for almost everything — reward hacking the majority class
+  with persuasive but wrong prose.
+
+- **Cheatsheet / entropy-decay RL — telegraphic word-salad that latches onto a single tell.** Median
+  reasoning shrinks to **15–23 words** and concreteness halves. The single most-cited feature for both
+  is the **em-dash** (Claude's #1 stylometric discriminator) — the channel fixates on one surface cue
+  and discards the rest, then mode-collapses onto one provider each (cheatsheet→CLAUDE 342,
+  entropy-decay→GEMINI 346). The prose degrades into incoherent fragments, e.g. cheatsheet (GEMINI):
+  *"Verbose ontology taxonomy erupts + 'motion capture' typographic caps abandon hyphenation
+  mid-transcript, emphatic glyph bombs in thesis echoes late-diffusion implosion, graphic-explanatory
+  boxes perform oversized formatting excess."* — it still *gestures* at real tells (caps, diagrams) but
+  has lost the ability to argue.
+
+- **RLSD / OPCD (the collapsed distillation runs) — runaway, un-grounded reasoning.** Concreteness
+  craters to 0.10 and hedging explodes to 0.70 as the model emits 2000+ tokens that **never close the
+  `</reason_why>` tag**, frequently **echoing the input blog back verbatim**, e.g. rlsd-e3:
+  *"- 'It is invoked by autocrats and anarchists… functioning as a seemingly unassifiable benchmark of
+  legitimate governance…'"* (quoting the article, not analysing it). The reasoning channel has stopped
+  doing classification and become an un-anchored text generator → 100% truncation, ~0 accuracy.
+
+### XVI.3 — The throughline
+
+The three providers' tells are **learnable and verbalizable**: every grounded model reads them off in
+plain language, and what it names (em-dash & sincerity = Claude; hedged headers & lists = ChatGPT;
+intensifiers & ASCII/LaTeX density = Gemini) matches the stylometric probe one-for-one. What differs is
+**discipline of the channel**: SFT and cold-start RL keep the reasoning short, concrete and balanced;
+unanchored reasoning-RL progressively trades grounded analysis for a confident single-class shortcut
+(pure-accuracy), then for em-dash-fixated fragments (cheatsheet/entropy-decay), then for runaway echo
+(RLSD/OPCD). This is the prose-level fingerprint of the same finding as Parts X–XIII: the tells were
+never the problem — keeping the reasoning channel *anchored while it is rewarded* is.

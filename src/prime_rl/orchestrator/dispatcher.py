@@ -132,7 +132,7 @@ class RolloutDispatcher:
         max_inflight_rollouts: int,
         tasks_per_minute: float | None,
         max_off_policy_steps: int,
-        training_mode: Literal["rl", "opd", "sft"],
+        training_mode: Literal["rl", "opd", "sft", "opcd", "rlsd", "rlsd_anchored"],
         use_cache_salt: bool = True,
     ) -> None:
         self.policy = policy

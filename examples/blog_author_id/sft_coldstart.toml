@@ -1,0 +1,53 @@
+# COLD-START SFT (Phase 1 of the cold-start ablation). ~60 steps of SFT from BASE on the
+# verifier-passed STaR reasoning traces (blog_sft_star_e1_trunc, 1071 rows, <reason_why>/<answer>
+# format under the generic SYSTEM_PROMPT_3WAY, thinking OFF). This is a LIGHT cold-start (60*batch16
+# = 960 samples seen, < 1 epoch) meant only to give the model a sane reasoning FORMAT/policy before
+# RL -- analogous to the DeepSeek-R1 cold-start. Phase 2 (rl_3way_coldstart.toml) runs generic 3-way
+# reasoning GRPO from the step-60 weights to test whether a reasoning cold-start prevents the
+# truncation collapse that BASE-init reasoning RL always hits.
+# Launch: uv run sft @ examples/blog_author_id/sft_coldstart.toml
+output_dir = "outputs/coldstart_sft"
+max_steps = 60
+clean_output_dir = true
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+attn = "flash_attention_2"
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[model.ac]  # full activation checkpointing
+mode = "full"
+
+# Qwen3.5 renderer with thinking disabled (matches eval + RL parity; the traces inject an empty
+# <think></think> block exactly like the RL phase and every other eval here).
+[renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[data]
+type = "sft"
+name = "data/blog_sft_star_e1_trunc"
+seq_len = 4096
+batch_size = 16
+micro_batch_size = 1
+pack_function = "stack"  # pad each sample to seq_len; no cross-sample attention bleed
+shuffle = true
+
+[optim]
+lr = 1e-5
+weight_decay = 0.01
+
+[scheduler]
+type = "cosine"
+warmup_steps = 10
+
+# Save the final (step-60) HF-format weights so Phase 2 RL can init from
+# outputs/coldstart_sft/weights/step_60. interval=60 -> only final ckpt (disk-tight box).
+[ckpt]
+interval = 60
+weights_only = true
+
+[deployment]
+type = "single_node"
+num_gpus = 8

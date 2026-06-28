@@ -1,3 +1,16 @@
+> ## 📝 This fork: reproducing the blog
+> This is a **research fork of prime-rl** used for the blog/log on training **Qwen3.5-9B (thinking OFF)**
+> to identify whether a blog post was authored by **CLAUDE / CHATGPT / GEMINI**.
+>
+> **➡️ See [`REPRODUCING_THE_BLOG.md`](REPRODUCING_THE_BLOG.md)** for the full reproduction guide:
+> where every run's config lives, the data builders, the scripts, and links to all models/traces on
+> the Hugging Face Hub. The write-ups are [`EXPERIMENT_BLOG.md`](EXPERIMENT_BLOG.md) and
+> [`RL_LOG.md`](RL_LOG.md) (Part XV = the full run ladder with all artifact links).
+>
+> Everything below is the upstream prime-rl README.
+
+---
+
 <p align="center">
 </p>
 

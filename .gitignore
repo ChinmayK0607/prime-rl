@@ -203,3 +203,24 @@ debug_I2_zero_band
 outputs/
 
 third_party/**/cache-*.arrow
+
+# --- Blog-author-id reproduction: heavy/regenerable artifacts ---
+# Inference traces (~300 MB) are published on the HF Hub dataset instead:
+#   https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces
+blog-eval/traces/
+# Built HF datasets (~1.5 GB, regenerate with data/build_blog_*.py)
+data/blog_author_id_3way*/
+data/blog_author_id_*aug*/
+data/blog_author_id_*curriculum*/
+data/blog_author_id_balanced/
+data/blog_author_id_contrastive/
+data/blog_author_id_diverse/
+data/blog_author_id_hardpair/
+data/blog_author_id_pairwise/
+data/blog_author_id_pvg/
+data/blog_author_id_trio/
+data/blog_author_id_v2/
+data/blog_author_id_overfit*/
+data/blog_sft*/
+# Stray HF arrow caches
+data/**/cache-*.arrow

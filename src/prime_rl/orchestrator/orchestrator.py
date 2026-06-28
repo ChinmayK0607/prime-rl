@@ -22,9 +22,11 @@ from __future__ import annotations
 
 import asyncio
 import ctypes
+import json
 import logging
 import os
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import tomli_w
@@ -76,6 +78,7 @@ from prime_rl.orchestrator.utils import (
 from prime_rl.orchestrator.watcher import WeightWatcher
 from prime_rl.trainer.model import setup_tokenizer
 from prime_rl.transport import TrainingBatch, setup_training_batch_sender
+from prime_rl.transport.types import TEACHER_LOGPROB_MODES
 from prime_rl.utils.async_utils import safe_cancel
 from prime_rl.utils.client import init_nccl_broadcast, setup_inference_pool
 from prime_rl.utils.heartbeat import Heartbeat
@@ -182,6 +185,7 @@ class Orchestrator:
         self.renderer = None
         self.mm_token_type_ids_mapping = None
         self.teacher_inference = None
+        self.cheatsheet_splice = None
         self.heart = None
         self.usage_reporter = None
         self.inference_metrics = None
@@ -239,6 +243,14 @@ class Orchestrator:
                 model_name=config.teacher.model.name,
                 train_client_type="openai_chat_completions",
             )
+            if config.cheatsheet_splice_path is not None:
+                splice = json.loads(Path(config.cheatsheet_splice_path).read_text())
+                self.cheatsheet_splice = (splice["plain_prefix_ids"], splice["cheat_prefix_ids"])
+                get_logger().info(
+                    f"Loaded cheatsheet teacher splice from {config.cheatsheet_splice_path} "
+                    f"(plain prefix {len(self.cheatsheet_splice[0])} tok -> "
+                    f"cheat prefix {len(self.cheatsheet_splice[1])} tok)"
+                )
 
         get_logger().info(f"Initializing monitor (wandb={config.wandb}, prime_monitor={config.prime_monitor})")
         self.monitor = setup_monitor(
@@ -564,14 +576,15 @@ class Orchestrator:
             save_rollouts, rollout_dicts, step_path / "train_rollouts.jsonl", exclude_keys={"trajectory"}
         )
 
-        teacher_logprobs_time = 0.0  # opd only
-        if config.training_mode == "opd" and self.teacher_inference is not None:
+        teacher_logprobs_time = 0.0  # opd / opcd / rlsd only
+        if config.training_mode in TEACHER_LOGPROB_MODES and self.teacher_inference is not None:
             assert config.teacher is not None
             t = time.perf_counter()
             teacher_logprobs_list = await compute_teacher_logprobs(
                 clients=self.teacher_inference.train_clients,
                 model_name=config.teacher.model.name,
                 samples=batch.samples,
+                cheatsheet_splice=self.cheatsheet_splice,
             )
             for ex, lp in zip(batch.samples, teacher_logprobs_list):
                 ex.teacher_logprobs = lp

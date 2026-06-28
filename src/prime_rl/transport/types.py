@@ -2,7 +2,11 @@ from typing import Literal
 
 import msgspec
 
-TrainingMode = Literal["rl", "opd", "sft"]
+TrainingMode = Literal["rl", "opd", "sft", "opcd", "rlsd", "rlsd_anchored"]
+
+# Modes where the orchestrator must fetch per-token teacher logprobs on the
+# student's rollouts (opd + the cheatsheet-teacher distillation experiments).
+TEACHER_LOGPROB_MODES = frozenset({"opd", "opcd", "rlsd", "rlsd_anchored"})
 
 
 # Encoded tensor: {dtype: "float32", shape: [...], data: <bytes>}.

@@ -1,0 +1,100 @@
+# COLD-START RL (Phase 2 of the cold-start ablation). Generic 3-way reasoning GRPO initialized
+# from the Phase-1 SFT-60 checkpoint (NOT from BASE). Qwen3.5-9B, thinking OFF, 8x H100.
+#
+# QUESTION: BASE-init reasoning-channel RL on this task ALWAYS collapses (truncation -> high,
+# accuracy -> low: trio, OPCD, RLSD, E-LEX-LONG). Does a light reasoning COLD-START (60 SFT steps on
+# verifier-passed STaR traces) give RL a stable starting policy so it improves instead of collapsing?
+#
+# CLEAN SETUP: control recipe DPPO + Dr.GRPO (default DPPO+KL loss, NO override; default Dr.GRPO
+# advantage; no teacher / no cheatsheet / no shaping). GENERIC prompt (prompt_variant default =
+# SYSTEM_PROMPT_3WAY) -- same prompt the SFT cold-start traces use, so the cold-start transfers. Same
+# data (3way_v2) + same PLAIN val eval (temp 0.7) as OPCD/RLSD/E-LEX for comparability. The ONLY
+# things different from a BASE-init generic reasoning GRPO run are the init weights (SFT-60).
+#
+# REQUIRES Phase 1 done first: outputs/coldstart_sft/weights/step_60 must exist.
+# Launch: uv run rl @ examples/blog_author_id/rl_3way_coldstart.toml --output-dir outputs/coldstart_rl
+
+max_steps = 40
+seq_len = 16384
+
+[model]
+# Init from the cold-start SFT checkpoint (full HF-format weights dir saved by Phase 1).
+name = "/home/ubuntu/blogger/prime-rl/outputs/coldstart_sft/weights/step_60"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+[inference.server]
+port = 8300  # 8000 is held by a shared service on this box
+
+[inference.model]
+max_model_len = 16384
+reasoning_parser = "None"
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+[orchestrator]
+# training_mode defaults to "rl" (plain GRPO, no teacher).
+batch_size = 144
+group_size = 12  # mixed groups keep verifier advantage variance alive
+
+[orchestrator.student.client]
+base_url = ["http://localhost:8300/v1"]
+
+# Plain Dr.GRPO advantage (correct-vs-incorrect within group). No shaping, so any change vs the
+# established BASE-init collapse is attributable to the SFT cold-start init alone.
+[orchestrator.advantage]
+type = "default"
+
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+# GENERIC reasoning prompt (prompt_variant omitted => SYSTEM_PROMPT_3WAY), matching the SFT traces.
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 4096
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-grpo-3way-coldstart-sft60-then-rl"
+
+[ckpt]
+interval = 40
+keep_last = 1
+
+[trainer.ckpt]
+weights_only = true

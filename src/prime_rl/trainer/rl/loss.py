@@ -1,4 +1,5 @@
 import inspect
+import math
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -461,6 +462,183 @@ def opd_loss_fn(inputs: LossInputs) -> LossOutputs:
     return LossOutputs(loss=loss, metrics=metrics)
 
 
+def opcd_loss_fn(inputs: LossInputs) -> LossOutputs:
+    """On-Policy Context Distillation (OPCD, experiment E2).
+
+    Distills a cheatsheet-conditioned teacher into the plain student using the
+    per-token teacher/student logprob GAP (``teacher_logprobs - trainer_logprobs``)
+    as the gradient signal, on the student's own on-policy rollouts.
+
+    This is the SAMPLED on-policy (reverse-KL-flavoured) realization, NOT a
+    full-vocabulary forward KL ``D_KL(p_T || p_S)``. Unlike ``opd_loss_fn`` the
+    DPPO trust region is keyed off the DISTILLATION direction (sign of the teacher
+    gap), not a verifier advantage, so the mask matches the actual update sign.
+    """
+    trainer_logprobs = inputs.trainer_logprobs
+    inference_logprobs = inputs.inference_logprobs
+    teacher_logprobs = inputs.teacher_logprobs
+    loss_mask = inputs.loss_mask
+
+    if teacher_logprobs is None:
+        raise ValueError("opcd_loss_fn requires teacher_logprobs - configure a cheatsheet teacher.")
+
+    log_importance_ratio, importance_ratio, mismatch_kl = compute_importance_ratio_and_mismatch_kl(
+        trainer_logprobs, inference_logprobs
+    )
+
+    teacher_kl = (teacher_logprobs - trainer_logprobs).detach()
+
+    # Trust region keyed off the distillation direction: where the teacher wants
+    # higher prob (gap > 0) drop tokens that already rose too far; where it wants
+    # lower prob drop tokens that already fell too far.
+    probs_diff = torch.exp(trainer_logprobs) - torch.exp(inference_logprobs)
+    push_up = teacher_kl > 0
+    invalid_high = probs_diff > 0.2
+    invalid_low = probs_diff < -0.2
+    is_masked = torch.where(push_up, invalid_high, invalid_low)
+    keep_mask = loss_mask & ~is_masked
+
+    pg_loss = keep_mask * teacher_kl * importance_ratio
+    kl_loss = loss_mask * log_importance_ratio**2
+    loss = (-pg_loss + 1e-3 * kl_loss).sum()
+
+    metrics = {
+        "teacher_kl": _safe_mean(teacher_kl, loss_mask),
+        "is_masked": _safe_mean(is_masked, loss_mask),
+        "masked_mismatch_kl": _safe_mean(mismatch_kl, loss_mask & is_masked),
+        "unmasked_mismatch_kl": _safe_mean(mismatch_kl, keep_mask),
+    }
+    return LossOutputs(loss=loss, metrics=metrics)
+
+
+def rlsd_loss_fn(inputs: LossInputs) -> LossOutputs:
+    """Verifier-anchored on-policy self-distillation (RLSD, experiment E3).
+
+    Per-token weight ``w_t = (P_T / P_S)^sign(A)``, PPO-clipped on the student
+    ratio, where ``P_T`` is the cheatsheet-teacher logprob, ``P_S`` the rollout
+    (inference) logprob and ``A`` the verifier advantage. The verifier supplies
+    the DIRECTION (reinforce correct rollouts, suppress incorrect ones); the
+    teacher/student gap supplies the per-token MAGNITUDE.
+
+        delta_t   = teacher_logprobs - inference_logprobs   # log(P_T / P_S)
+        coef_t    = sign(A) * exp(clamp(sign(A) * delta_t, -c, c))   # 0 when A == 0
+        loss_t    = - sg(coef_t) * sg(clip(rho_t)) * trainer_logprobs_t
+
+    ``rho_t = pi_theta / mu`` is the student trainer/rollout ratio; clipping +
+    stop-gradient (CISPO-style) bound the off-policy variance while the gradient
+    still flows through ``trainer_logprobs`` for every trainable token.
+    """
+    trainer_logprobs = inputs.trainer_logprobs
+    inference_logprobs = inputs.inference_logprobs
+    teacher_logprobs = inputs.teacher_logprobs
+    advantages = inputs.advantages
+    loss_mask = inputs.loss_mask
+
+    if teacher_logprobs is None:
+        raise ValueError("rlsd_loss_fn requires teacher_logprobs - configure a cheatsheet teacher.")
+
+    eps_low, eps_high, clip_c = 0.2, 0.2, 2.0
+
+    log_importance_ratio, importance_ratio, mismatch_kl = compute_importance_ratio_and_mismatch_kl(
+        trainer_logprobs, inference_logprobs
+    )
+
+    sign_a = torch.sign(advantages)  # +1 / 0 / -1 -> A == 0 contributes nothing
+    delta = teacher_logprobs - inference_logprobs
+    log_w = torch.clamp(sign_a * delta, -clip_c, clip_c)
+    coef = (sign_a * torch.exp(log_w)).detach()
+
+    clipped_ratio = torch.clamp(importance_ratio, 1.0 - eps_low, 1.0 + eps_high).detach()
+    pg_loss = loss_mask * coef * clipped_ratio * trainer_logprobs
+    kl_loss = loss_mask * log_importance_ratio**2
+    loss = (-pg_loss + 1e-3 * kl_loss).sum()
+
+    metrics = {
+        "rlsd_coef": _safe_mean(coef, loss_mask),
+        "rlsd_delta": _safe_mean(delta, loss_mask),
+        "rlsd_sign_pos": _safe_mean((sign_a > 0).float(), loss_mask),
+        "rlsd_sign_neg": _safe_mean((sign_a < 0).float(), loss_mask),
+        "unmasked_mismatch_kl": _safe_mean(mismatch_kl, loss_mask),
+    }
+    return LossOutputs(loss=loss, metrics=metrics)
+
+
+def rlsd_anchored_loss_fn(inputs: LossInputs) -> LossOutputs:
+    """Trust-region-anchored RLSD (experiment E3b).
+
+    Same verifier-anchored self-distillation signal as ``rlsd_loss_fn`` but with an
+    explicit trust region added to stop the runaway-truncation collapse seen in E3
+    (val peaked 0.409 at step 12, then fell off a cliff to 100% truncation by step 20).
+    Four anchoring changes vs the unanchored ``rlsd_loss_fn``:
+
+      1. tighter distillation-magnitude clip (``clip_c`` 2.0 -> 1.0): the per-token
+         weight coef stays in ``[1/e, e]`` instead of ``[1/e^2, e^2]``;
+      2. tighter CISPO ratio clip (``eps`` 0.2 -> 0.1);
+      3. a per-token trust-region MASK keyed on the update direction (sign of coef):
+         drop tokens whose trainer/rollout RATIO already moved past ``1 +/- eps`` in
+         the push direction. (Earlier draft used an absolute-prob threshold, which has
+         boundary blind spots at very low/high token probs; a ratio/log-ratio band is a
+         consistent trust region. The original RLSD applied coef to EVERY token.)
+      4. a STRONG KL-to-rollout penalty (proper k3 KL ``mismatch_kl``, ``kl_beta`` 0.5)
+         replacing the near-zero ``1e-3 * log_ratio^2`` term, as a soft backstop behind
+         the hard ratio mask, so each update stays in a trust region around the behaviour
+         policy ``mu`` that generated the rollouts.
+
+    Anchors to the BEHAVIOUR (rollout) policy ``mu``, NOT a frozen base — no reference
+    model is plumbed in prime-rl. Since ``mu`` is regenerated from the live policy every
+    step, this is a per-step (local) trust region: it blocks the single-step explosion
+    that caused the E3 cliff, but cannot by itself pin the policy to the step-12 peak if
+    ``mu`` drifts slowly. If it still collapses, that is evidence a local anchor is
+    insufficient and a frozen/best-checkpoint reference (or a length/termination penalty)
+    is required.
+    """
+    trainer_logprobs = inputs.trainer_logprobs
+    inference_logprobs = inputs.inference_logprobs
+    teacher_logprobs = inputs.teacher_logprobs
+    advantages = inputs.advantages
+    loss_mask = inputs.loss_mask
+
+    if teacher_logprobs is None:
+        raise ValueError("rlsd_anchored_loss_fn requires teacher_logprobs - configure a cheatsheet teacher.")
+
+    eps_low, eps_high, clip_c, kl_beta = 0.1, 0.1, 1.0, 0.5
+
+    log_importance_ratio, importance_ratio, mismatch_kl = compute_importance_ratio_and_mismatch_kl(
+        trainer_logprobs, inference_logprobs
+    )
+
+    sign_a = torch.sign(advantages)  # +1 / 0 / -1 -> A == 0 contributes nothing
+    delta = teacher_logprobs - inference_logprobs
+    log_w = torch.clamp(sign_a * delta, -clip_c, clip_c)
+    coef = (sign_a * torch.exp(log_w)).detach()
+
+    # Ratio-based trust-region mask keyed on the update direction (sign of coef): where
+    # we push prob UP, drop tokens whose trainer/rollout ratio already exceeds 1+eps_high;
+    # where we push DOWN, drop tokens already below 1-eps_low. log-ratio band avoids the
+    # absolute-probability boundary blind spots.
+    push_up = coef > 0
+    invalid_high = log_importance_ratio > math.log1p(eps_high)
+    invalid_low = log_importance_ratio < math.log1p(-eps_low)
+    is_masked = torch.where(push_up, invalid_high, invalid_low)
+    keep_mask = loss_mask & ~is_masked
+
+    clipped_ratio = torch.clamp(importance_ratio, 1.0 - eps_low, 1.0 + eps_high).detach()
+    pg_loss = keep_mask * coef * clipped_ratio * trainer_logprobs
+    kl_loss = loss_mask * mismatch_kl  # k3 KL, gradient d/dlogp = importance_ratio - 1 (not detached)
+    loss = (-pg_loss + kl_beta * kl_loss).sum()
+
+    metrics = {
+        "rlsd_coef": _safe_mean(coef, loss_mask),
+        "rlsd_delta": _safe_mean(delta, loss_mask),
+        "rlsd_sign_pos": _safe_mean((sign_a > 0).float(), loss_mask),
+        "rlsd_sign_neg": _safe_mean((sign_a < 0).float(), loss_mask),
+        "is_masked": _safe_mean(is_masked.float(), loss_mask),
+        "trust_region_kl": _safe_mean(mismatch_kl, loss_mask),
+        "unmasked_mismatch_kl": _safe_mean(mismatch_kl, keep_mask),
+    }
+    return LossOutputs(loss=loss, metrics=metrics)
+
+
 def sft_loss_fn(inputs: LossInputs) -> LossOutputs:
     """SFT-style masked negative log-likelihood over trainable tokens."""
     trainer_logprobs = inputs.trainer_logprobs
@@ -482,6 +660,8 @@ def setup_loss_fns(loss_config: LossConfig) -> dict[str, LossFn]:
     - ``"sft"`` → ``sft_loss_fn`` (masked NLL on teacher tokens)
     - ``"opd"`` → ``opd_loss_fn`` (teacher KL as gradient signal, hardcoded
       DPPO + KL knobs)
+    - ``"opcd"`` → ``opcd_loss_fn`` (on-policy context distillation, E2)
+    - ``"rlsd"`` → ``rlsd_loss_fn`` (verifier-anchored self-distillation, E3)
     - ``"rl"``  → ``default_loss_fn(loss_config)`` for ``DefaultLossConfig``,
       or the imported function for ``CustomLossConfig``.
 
@@ -505,7 +685,14 @@ def setup_loss_fns(loss_config: LossConfig) -> dict[str, LossFn]:
         def rl_fn(inputs: LossInputs, **dyn) -> LossOutputs:
             return default_loss_fn(inputs, loss_config)
 
-    return {"sft": sft_loss_fn, "opd": opd_loss_fn, "rl": rl_fn}
+    return {
+        "sft": sft_loss_fn,
+        "opd": opd_loss_fn,
+        "opcd": opcd_loss_fn,
+        "rlsd": rlsd_loss_fn,
+        "rlsd_anchored": rlsd_anchored_loss_fn,
+        "rl": rl_fn,
+    }
 
 
 def compute_loss(

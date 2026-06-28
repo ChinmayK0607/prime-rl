@@ -1,0 +1,104 @@
+# E-LEX — plain GRPO with a LEXICAL-CORRELATION prompt. Qwen3.5-9B, thinking OFF,
+# 8x H100 (4 train FSDP + 4 infer vLLM tp=2).
+#
+# IDEA (user). Keep the RL vanilla (default GRPO, default advantage, NO teacher / no
+# cheatsheet) but swap the system prompt for a TF-IDF-style LEXICAL one: instruct the
+# model to find the most DISCRIMINATIVE words/phrases/punctuation (high term-freq for one
+# provider, rare in the others) and weigh them, instead of the generic holistic "judge HOW
+# it's written". Tests whether steering the reasoning toward concrete lexical fingerprints
+# lets plain RL climb above the ~0.36 feature-blind pass@1 baseline.
+#
+# CLEAN ATTRIBUTION: identical to the CONTROL 3-way reasoning GRPO run (rl_3way_div_default:
+# DPPO + Dr.GRPO, i.e. default DPPO+KL loss with NO override + default Dr.GRPO advantage)
+# except the env prompt_variant="lexical". The prompt does NOT reveal which tokens map to which
+# provider (no example words) — RL must discover the word<->provider correlations on its own.
+# Reasoning ON (require_reason, min_reason_words=12), same eval (PLAIN, temp 0.7) as OPCD/RLSD
+# so val is directly comparable. Init from BASE.
+#
+# Launch: uv run rl @ examples/blog_author_id/rl_3way_lexical.toml --output-dir outputs/lexical_elex
+
+max_steps = 40
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+[inference.server]
+port = 8300  # 8000 is held by a shared service on this box
+
+[inference.model]
+max_model_len = 16384
+reasoning_parser = "None"
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+[orchestrator]
+# training_mode defaults to "rl" (plain GRPO, no teacher).
+batch_size = 144
+group_size = 12  # mixed groups keep verifier advantage variance alive
+
+[orchestrator.student.client]
+base_url = ["http://localhost:8300/v1"]
+
+# Plain Dr.GRPO advantage (correct-vs-incorrect within group). No truncation penalty /
+# no shaping, so any gain is attributable to the lexical PROMPT alone.
+[orchestrator.advantage]
+type = "default"
+
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+# The LEXICAL system prompt is selected by the env via prompt_variant="lexical".
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false, prompt_variant = "lexical" }
+
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 4096
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false, prompt_variant = "lexical" }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-grpo-3way-lexical-tfidf-prompt"
+
+[ckpt]
+interval = 40
+keep_last = 1
+
+[trainer.ckpt]
+weights_only = true
+interval = 40
+keep_last = 1

@@ -53,9 +53,58 @@ MODELS = {
         title="Qwen3.5-9B — Blog-Provider-ID — RL (pure-accuracy, peak)",
         body="**Method:** answer-only / no-reasoning GRPO (reward = exact label match). This is the PEAK checkpoint (step_16) before the run collapsed.\n\n**Result:** peaked val 0.650 / val_ood 0.662, then collapsed (CLAUDE absorbed into CHATGPT → 2-class ceiling) and hit the zero-trainable-batch guardrail. Directionally showed answer-only > reasoning-RL, but sparse single-token RL collapsed the fine boundary. (NB: raw weight-broadcast snapshot; config/tokenizer copied from the matching base arch.)",
     ),
+    "coldstart_sft": dict(
+        path="outputs/coldstart_sft/weights/step_60",
+        repo=f"{USER}/qwen3.5-9b-blogprovider-coldstart-sft",
+        title="Qwen3.5-9B — Blog-Provider-ID — Cold-Start SFT warm-up (60 steps)",
+        body="**Method:** 60-step SFT from base on 1071 verifier-passed STaR reasoning traces (`<reason_why>/<answer>`). The Phase-1 *warm-start* for the cold-start RL ablation — teaches the reasoning format + a competent prior, not to solve the task.\n\n**Result:** lifts the reasoning-channel starting policy to val ~0.67 at 0% truncation (vs ~0.13–0.21 for base init). Used to initialise the cold-start RL run (see -coldstart-rl).",
+    ),
+    "coldstart_rl": dict(
+        path="outputs/coldstart_rl/weights/step_40",
+        repo=f"{USER}/qwen3.5-9b-blogprovider-coldstart-rl",
+        title="Qwen3.5-9B — Blog-Provider-ID — Cold-Start RL (SFT-60 → reasoning GRPO)",
+        body="**Method:** generic reasoning GRPO (control DPPO + Dr.GRPO, hint-free prompt, no teacher/cheatsheet) initialised from the 60-step cold-start SFT checkpoint. The headline of the cold-start ablation.\n\n**Result:** the first reasoning-channel RL here that climbs AND never collapses — val ~0.67 → ~0.89 with **0% truncation at every step** (base-init reasoning RL collapses to 60–100% truncation every seed). Shows the collapse was a cold-start pathology, not intrinsic to the reasoning channel. Still below answer-only SFT (1.000); value is diagnostic.",
+    ),
+    "rlsd_e3": dict(
+        path="outputs/rlsd_e3/weights/step_40",
+        repo=f"{USER}/qwen3.5-9b-blogprovider-rlsd-e3",
+        title="Qwen3.5-9B — Blog-Provider-ID — RLSD (E3, verifier-anchored self-distillation)",
+        body="**Method (OPSD E3):** RLSD — on-policy self-distillation that combines the verifier sign (direction) with a cheatsheet-teacher per-token magnitude (`coef_t = sign(A)·exp(clip(sign(A)·Δ))`), PPO-clipped on the student ratio. Teacher = the live student pool with the train-derived style cheatsheet spliced into the scoring prompt. Init from base. Final checkpoint (step_40).\n\n**Result:** produced the best transient reasoning-channel number (peaked val ~0.41, truncation briefly 38%→9%) then collapsed into ~100% truncation without a trust-region/length anchor. Part of the reasoning-channel-RL-collapse analysis.",
+    ),
+    "opcd_e2": dict(
+        path="outputs/opcd_e2/weights/step_40",
+        repo=f"{USER}/qwen3.5-9b-blogprovider-opcd-e2",
+        title="Qwen3.5-9B — Blog-Provider-ID — OPCD (E2, on-policy context distillation)",
+        body="**Method (OPSD E2):** OPCD — sampled context-distillation. The cheatsheet-conditioned teacher (live student pool + spliced train-derived cheatsheet) supplies per-token targets distilled onto the plain-prompt student; reverse-KL-flavoured, sampled (not full-vocab forward KL). Init from base. Final checkpoint (step_40).\n\n**Result:** peaked val ~0.29 then collapsed into runaway truncation without a length/trust-region anchor — same cold-start fragility as the other base-init reasoning methods (which the cold-start ablation later fixes).",
+    ),
 }
 
 IGNORE = ["STABLE", "NCCL_READY", "*.pid", "README.md.lock"]
+
+# Qwen3.5-9B is a VLM; the prime-rl trainer weight-save omits the processor/aux files.
+# Copy them from the base snapshot into a checkpoint dir if missing so the pushed model
+# is loadable by vLLM + transformers.
+PROC_FILES = ["preprocessor_config.json", "video_preprocessor_config.json",
+              "merges.txt", "vocab.json", "chat_template.jinja"]
+
+
+def ensure_processor_files(path):
+    import glob, shutil
+    have = set(os.listdir(path))
+    missing = [f for f in PROC_FILES if f not in have]
+    if not missing:
+        return
+    snaps = glob.glob(os.path.expanduser(
+        "~/.cache/huggingface/hub/models--Qwen--Qwen3.5-9B/snapshots/*"))
+    if not snaps:
+        print(f"  WARN: base snapshot not found, cannot backfill {missing}", flush=True)
+        return
+    snap = snaps[0]
+    for f in missing:
+        src = os.path.join(snap, f)
+        if os.path.exists(src):
+            shutil.copy(os.path.realpath(src), os.path.join(path, f))
+            print(f"  backfilled {f}", flush=True)
 
 
 def card(m):
@@ -81,6 +130,7 @@ def main():
         m = MODELS[k]
         p = m["path"]
         assert os.path.isdir(p), f"missing {p}"
+        ensure_processor_files(p)
         with open(os.path.join(p, "README.md"), "w") as f:
             f.write(card(m))
         print(f"\n=== [{k}] create_repo {m['repo']} (public) ===", flush=True)

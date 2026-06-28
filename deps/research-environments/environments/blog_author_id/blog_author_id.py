@@ -105,6 +105,48 @@ Respond with ONLY this single tag and nothing else (no reasoning, no preamble, n
 - Always classify; choose exactly one provider.
 - Output nothing before or after the <answer> tag. Do NOT explain. Do NOT output <think>."""
 
+# Lexical-correlation variant (experiment E-LEX). Same <reason_why>/<answer> format as
+# SYSTEM_PROMPT_3WAY (so the parser, reward, require_reason gate are all unchanged) but the
+# GUIDANCE is swapped: instead of holistic "judge HOW it's written", it instructs an explicit
+# TF-IDF-style lexical analysis — find the most DISCRIMINATIVE words/phrases/punctuation (high
+# term-freq for one provider, rare in the others) and weigh them. Tests whether steering the
+# reasoning toward concrete lexical fingerprints lifts accuracy over the generic reasoning prompt.
+SYSTEM_PROMPT_3WAY_LEXICAL = """You are an expert forensic linguist who identifies AI text-generators from their LEXICAL FINGERPRINTS.
+
+## TASK
+You will be given a piece of text. It was written by exactly one of these three AI providers. Identify which one:
+- CLAUDE — Anthropic's Claude
+- CHATGPT — OpenAI's ChatGPT
+- GEMINI — Google's Gemini
+
+## METHOD (lexical correlation, TF-IDF style)
+Each provider has a characteristic vocabulary: specific words, phrases, transitions, punctuation and formatting habits that recur far more often in its output than in the others'. Find the most DISCRIMINATIVE tokens in THIS text — the ones distinctive of one provider and rare in the other two (high term-frequency for that provider, low document-frequency across providers) — and weigh them to decide. You are NOT told which tokens belong to which provider, nor what the tell-tale tokens are; you must infer those associations entirely on your own from the surface form of the text. Look only at HOW it is written:
+- Word and phrase choice: favoured connectives, hedges, transitions and stock phrasings.
+- Punctuation and formatting tells: dash style, quote style, bullet/heading style, bold/italic habits, emoji, spacing.
+- Opening/closing formulae, list framings and sentence rhythm.
+Judge only the tokens and surface form, never WHAT the text is about — topic words carry no provider signal.
+
+## OUTPUT FORMAT
+Respond using exactly these two tags, nothing outside them:
+
+<reason_why>
+2-4 sentences. Name the SPECIFIC discriminative words/phrases/punctuation you found and which provider each points to, quoting the actual tokens from the text, then your conclusion.
+</reason_why>
+
+<answer>
+Exactly one of: CLAUDE / CHATGPT / GEMINI
+Confidence: HIGH / MEDIUM / LOW
+</answer>
+
+## RULES
+- Always classify. Never refuse or skip a tag.
+- Choose exactly one provider.
+- Your response MUST begin with the literal tag <reason_why> and contain NOTHING before it (no preamble, no restating the task).
+- Keep <reason_why> to AT MOST 4 short sentences. Cite concrete tokens; do NOT deliberate at length, enumerate every feature, second-guess, back-track, or repeat yourself. Commit to your single best judgment.
+- You MUST close </reason_why> and then emit the full <answer> block. Never run out of room before answering.
+- Do NOT output <think> or </think> tags, or any text before <reason_why>; put all of your reasoning only inside <reason_why>.
+- If signals conflict, say so briefly and reflect that in your confidence."""
+
 # Hard-pair (2-way) auxiliary task: CLAUDE vs CHATGPT only. Used as an in-curriculum
 # auxiliary stream to force the policy onto the genuinely hard CLAUDE/CHATGPT
 # boundary (the one that collapses under 3-way correctness-only reward) WITHOUT a
@@ -477,9 +519,14 @@ def load_environment(
     min_reason_words: int = 12,
     cheatsheet: bool = False,
     answer_only: bool = False,
+    prompt_variant: str = "default",
 ) -> vf.Environment:
     if label_scheme not in ("binary", "provider3"):
         raise ValueError(f"unknown label_scheme {label_scheme!r}")
+    if prompt_variant not in ("default", "lexical"):
+        raise ValueError(f"unknown prompt_variant {prompt_variant!r}")
+    if prompt_variant == "lexical" and (label_scheme != "provider3" or answer_only):
+        raise ValueError("prompt_variant='lexical' requires label_scheme='provider3' and answer_only=False.")
     base = Path(data_dir) if data_dir else _data_dir()
     dataset = load_from_disk(str(base / split))
 
@@ -492,7 +539,12 @@ def load_environment(
 
     if label_scheme == "provider3":
         extract_fn = _make_extractor(_LABEL_RE_3WAY)
-        default_system_prompt = SYSTEM_PROMPT_3WAY_ANSWERONLY if answer_only else SYSTEM_PROMPT_3WAY
+        if answer_only:
+            default_system_prompt = SYSTEM_PROMPT_3WAY_ANSWERONLY
+        elif prompt_variant == "lexical":
+            default_system_prompt = SYSTEM_PROMPT_3WAY_LEXICAL
+        else:
+            default_system_prompt = SYSTEM_PROMPT_3WAY
     else:
         extract_fn = _make_extractor(_LABEL_RE)
         default_system_prompt = SYSTEM_PROMPT

@@ -96,17 +96,64 @@ def set_default_executor(max_workers: int = 64) -> None:
     asyncio.get_event_loop().set_default_executor(ThreadPoolExecutor(max_workers=max_workers))
 
 
+def splice_teacher_prompt(
+    prompt_ids: list[int], plain_prefix_ids: list[int], cheat_prefix_ids: list[int]
+) -> list[int]:
+    """Replace the leading plain system-prompt prefix with the cheatsheet-augmented
+    prefix, yielding the teacher prompt for the SAME policy conditioned on the
+    cheatsheet in-context. The blog + generation suffix tail is preserved verbatim.
+
+    Asserts the student prompt actually starts with the plain prefix so any
+    tokenizer / chat-template drift fails loudly instead of silently corrupting
+    the teacher distribution.
+    """
+    n = len(plain_prefix_ids)
+    if list(prompt_ids[:n]) != list(plain_prefix_ids):
+        raise ValueError(
+            "Cheatsheet splice failed: student prompt does not start with the expected plain "
+            "system-prompt prefix. Rebuild scripts/build_cheatsheet_splice.py with the exact "
+            "tokenizer + renderer used for rollouts."
+        )
+    return list(cheat_prefix_ids) + list(prompt_ids[n:])
+
+
+def realign_teacher_logprobs(
+    teacher_flat: list[float], student_prompt_len: int, completion_len: int
+) -> list[float]:
+    """Realign teacher prompt_logprobs (over teacher_prompt + completion) to the
+    STUDENT sample layout (plain prompt + completion). Prompt positions get 0.0
+    (masked out in the loss); completion positions get the teacher's completion
+    logprobs. The result length equals the student sample length, satisfying the
+    packer's ``teacher_logprobs length == sample length`` invariant.
+    """
+    completion_lp = teacher_flat[-completion_len:] if completion_len > 0 else []
+    return [0.0] * student_prompt_len + list(completion_lp)
+
+
 async def compute_teacher_logprobs(
     clients: list[vf.ClientConfig],
     model_name: str,
     samples: list[TrainingSample],
+    cheatsheet_splice: tuple[list[int], list[int]] | None = None,
 ) -> list[list[float]]:
-    """Compute teacher model logprobs for a batch of training samples via prefill."""
+    """Compute teacher model logprobs for a batch of training samples via prefill.
+
+    When ``cheatsheet_splice`` (plain_prefix_ids, cheat_prefix_ids) is provided,
+    the teacher scores a cheatsheet-injected prompt and the returned logprobs are
+    realigned to the student's plain sample length (opcd / rlsd experiments).
+    """
     import httpx
     from vllm.entrypoints.serve.disagg.protocol import GenerateResponse
 
     async def _compute_single(client_config: vf.ClientConfig, sample: TrainingSample) -> list[float]:
         client = setup_openai_client(client_config)
+
+        if cheatsheet_splice is not None:
+            plain_prefix_ids, cheat_prefix_ids = cheatsheet_splice
+            teacher_prompt_ids = splice_teacher_prompt(list(sample.prompt_ids), plain_prefix_ids, cheat_prefix_ids)
+        else:
+            teacher_prompt_ids = list(sample.prompt_ids)
+        token_ids = teacher_prompt_ids + list(sample.completion_ids)
 
         # Two escape hatches from ``AsyncOpenAI.post``:
         #   1. URL — ``/inference/v1/generate`` is mounted at server root, not
@@ -125,7 +172,7 @@ async def compute_teacher_logprobs(
             cast_to=httpx.Response,
             body={
                 "model": model_name,
-                "token_ids": list(sample.prompt_ids) + list(sample.completion_ids),
+                "token_ids": token_ids,
                 "sampling_params": {
                     "max_tokens": 1,
                     "temperature": 1.0,
@@ -147,6 +194,9 @@ async def compute_teacher_logprobs(
             first = next(iter(entry.values()))
             lp = first.logprob if hasattr(first, "logprob") else first.get("logprob")
             flat.append(float(lp) if lp is not None else 0.0)
+
+        if cheatsheet_splice is not None:
+            return realign_teacher_logprobs(flat, len(sample.prompt_ids), len(sample.completion_ids))
         return flat
 
     return await asyncio.gather(*[_compute_single(client, sample) for client, sample in zip(cycle(clients), samples)])

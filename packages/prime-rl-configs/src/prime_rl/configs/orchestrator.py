@@ -505,14 +505,22 @@ class RolloutModelConfig(BaseConfig):
 
 
 class OrchestratorConfig(BaseConfig):
-    training_mode: Literal["rl", "opd", "sft"] = "rl"
-    """Training mode. ``rl``: student generates rollouts, no teacher. ``opd``: student generates rollouts, teacher computes logprobs (teacher_tau > 0). ``sft``: teacher generates rollouts, student inference pool used for evals and weight sync."""
+    training_mode: Literal["rl", "opd", "sft", "opcd", "rlsd", "rlsd_anchored"] = "rl"
+    """Training mode. ``rl``: student generates rollouts, no teacher. ``opd``: student generates rollouts, teacher computes logprobs (teacher_tau > 0). ``sft``: teacher generates rollouts, student inference pool used for evals and weight sync. ``opcd``/``rlsd``/``rlsd_anchored``: cheatsheet-teacher on-policy (self-)distillation experiments E2/E3/E3b — student generates rollouts, teacher computes logprobs on a cheatsheet-injected prompt (see ``cheatsheet_splice_path``). ``rlsd_anchored`` adds a trust-region anchor (DPPO mask + tighter clips + KL-to-rollout) to stop the E3 truncation collapse."""
 
     student: RolloutModelConfig = Field(RolloutModelConfig(), validation_alias=AliasChoices("student", "model"))
     """Student rollout participant (model + client) — the model being trained."""
 
     teacher: RolloutModelConfig | None = Field(None, validation_alias=AliasChoices("teacher", "teacher_model"))
     """Teacher rollout participant (model + client). Role depends on ``training_mode``: ``opd`` — teacher computes logprobs; ``sft`` — teacher generates rollouts."""
+
+    cheatsheet_splice_path: str | None = None
+    """Path to a JSON file (built by ``scripts/build_cheatsheet_splice.py``) with
+    ``{"plain_prefix_ids": [...], "cheat_prefix_ids": [...]}``. When set (opcd/rlsd
+    modes), the teacher scores each rollout with the plain leading system-prompt
+    prefix replaced by the cheatsheet-augmented prefix, so the teacher is the SAME
+    policy conditioned on the cheatsheet in-context. The returned teacher logprobs
+    are realigned to the student's plain sample length."""
 
     train: TrainConfig = TrainConfig()
 
@@ -772,8 +780,13 @@ class OrchestratorConfig(BaseConfig):
         has_teacher = self.teacher is not None
         if self.training_mode == "rl" and has_teacher:
             raise ValueError("orchestrator.teacher must not be set when training_mode = 'rl'.")
-        if self.training_mode == "opd" and not has_teacher:
-            raise ValueError("orchestrator.teacher must be configured when training_mode = 'opd'.")
+        if self.training_mode in ("opd", "opcd", "rlsd", "rlsd_anchored") and not has_teacher:
+            raise ValueError(f"orchestrator.teacher must be configured when training_mode = '{self.training_mode}'.")
+        if self.training_mode in ("opcd", "rlsd", "rlsd_anchored") and not self.cheatsheet_splice_path:
+            raise ValueError(
+                f"orchestrator.cheatsheet_splice_path must be set when training_mode = '{self.training_mode}' "
+                "— without it the teacher prompt equals the student prompt and the distillation signal is empty."
+            )
         return self
 
     @model_validator(mode="after")

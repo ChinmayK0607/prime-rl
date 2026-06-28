@@ -1,0 +1,97 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "prompt_variant": "lexical",
+  "splits": {
+    "train": {
+      "n_blogs": 2682,
+      "k": 4,
+      "pass1": 0.3499,
+      "pass4": 0.8016,
+      "parse_fail_rate": 0.0001,
+      "truncation_rate": 0.0002,
+      "pred_dist": {
+        "CHATGPT": 4824,
+        "GEMINI": 3303,
+        "CLAUDE": 2600,
+        "<none>": 1
+      },
+      "per_provider": {
+        "CLAUDE": {
+          "n": 894,
+          "pass1": 0.2564,
+          "pass4": 0.7036
+        },
+        "CHATGPT": {
+          "n": 894,
+          "pass1": 0.4583,
+          "pass4": 0.906
+        },
+        "GEMINI": {
+          "n": 894,
+          "pass1": 0.335,
+          "pass4": 0.7953
+        }
+      }
+    },
+    "val": {
+      "n_blogs": 414,
+      "k": 4,
+      "pass1": 0.34,
+      "pass4": 0.7826,
+      "parse_fail_rate": 0.0,
+      "truncation_rate": 0.0,
+      "pred_dist": {
+        "GEMINI": 537,
+        "CHATGPT": 757,
+        "CLAUDE": 362
+      },
+      "per_provider": {
+        "CLAUDE": {
+          "n": 138,
+          "pass1": 0.221,
+          "pass4": 0.6014
+        },
+        "CHATGPT": {
+          "n": 138,
+          "pass1": 0.4438,
+          "pass4": 0.8986
+        },
+        "GEMINI": {
+          "n": 138,
+          "pass1": 0.3551,
+          "pass4": 0.8478
+        }
+      }
+    },
+    "val_ood": {
+      "n_blogs": 471,
+      "k": 4,
+      "pass1": 0.3519,
+      "pass4": 0.8025,
+      "parse_fail_rate": 0.0,
+      "truncation_rate": 0.0005,
+      "pred_dist": {
+        "GEMINI": 551,
+        "CHATGPT": 904,
+        "CLAUDE": 429
+      },
+      "per_provider": {
+        "CLAUDE": {
+          "n": 157,
+          "pass1": 0.242,
+          "pass4": 0.6752
+        },
+        "CHATGPT": {
+          "n": 157,
+          "pass1": 0.4904,
+          "pass4": 0.9172
+        },
+        "GEMINI": {
+          "n": 157,
+          "pass1": 0.3232,
+          "pass4": 0.8153
+        }
+      }
+    }
+  }
+}

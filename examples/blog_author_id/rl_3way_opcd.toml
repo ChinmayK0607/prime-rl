@@ -1,0 +1,132 @@
+# E2 — On-Policy Context Distillation (OPCD). Qwen3.5-9B, thinking OFF, 8x H100
+# (4 train FSDP + 4 infer vLLM tp=2). DO NOT LAUNCH until the user gives the go.
+#
+# IDEA. Teacher = the SAME live policy conditioned on the train-derived CHEATSHEET
+# in-context (base+cheatsheet ~0.66 acc, well above the feature-blind base ~0.40).
+# Student rolls out PLAIN (no cheatsheet). For every on-policy student rollout the
+# teacher scores the same completion under a cheatsheet-augmented prompt, and the
+# per-token teacher/student logprob GAP (teacher_logprobs - trainer_logprobs) is the
+# gradient signal (opcd_loss_fn). We distill the cheatsheet-conditioned behaviour
+# INTO the plain policy — i.e. internalize the cheatsheet without showing it.
+#
+# Teacher = student inference pool (same base_url + model); weights are broadcast to
+# that pool every step, so the teacher tracks the live student weights (true
+# same-weights OPSD). The cheatsheet is injected by REPLACING the plain leading
+# system-prompt prefix with the cheatsheet prefix at scoring time (orchestrator
+# splice). Build the splice FIRST:
+#   uv run python scripts/build_cheatsheet_splice.py --out data/cheatsheet_splice_3way.json
+#
+# FAITHFULNESS NOTE: this is the SAMPLED on-policy (reverse-KL-flavoured) realization
+# of context distillation, NOT a full-vocabulary forward KL. Report it as such.
+#
+# Init from BASE (max headroom + a real teacher>student gap, so the distillation
+# signal is non-degenerate — unlike starting from the saturated answer-only SFT).
+# Launch: uv run rl @ examples/blog_author_id/rl_3way_opcd.toml
+
+max_steps = 40
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+[inference.server]
+# Port 8000 is held by an unrelated shared service on this box; use 8300 and keep
+# the student + teacher clients pointed at the same server (see below).
+port = 8300
+
+[inference.model]
+max_model_len = 16384
+reasoning_parser = "None"
+
+[inference]
+# OPD teacher scoring computes full-vocab prompt_logprobs over (cheat_prompt +
+# completion); leave headroom below the 0.9 default so those logit tensors don't OOM.
+gpu_memory_utilization = 0.65
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+[orchestrator]
+training_mode = "opcd"
+batch_size = 96
+group_size = 8  # 12 prompts/step; distillation doesn't need group reward variance
+cheatsheet_splice_path = "/home/ubuntu/blogger/prime-rl/data/cheatsheet_splice_3way.json"
+
+# Student inference pool (the model being trained). Non-sft modes don't auto-set
+# base_url, so pin it to the chosen inference port.
+[orchestrator.student.client]
+base_url = ["http://localhost:8300/v1"]
+
+# Teacher = the SAME pool/model; only the prompt differs (cheatsheet spliced in by
+# the orchestrator). No extra GPUs, weights stay in lockstep with the student.
+[orchestrator.teacher.model]
+name = "Qwen/Qwen3.5-9B"
+
+[orchestrator.teacher.client]
+base_url = ["http://localhost:8300/v1"]
+
+# Qwen3.5 renderer, thinking OFF (must match build_cheatsheet_splice.py rendering).
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+# Student rolls out PLAIN (cheatsheet=false): the cheatsheet reaches the model ONLY
+# through the teacher scoring path, never the student prompt — zero eval leakage and
+# the whole point of the experiment (internalize, don't read).
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 4096
+
+# Eval is PLAIN (no cheatsheet) — measures whether the plain policy internalized the
+# cheatsheet-conditioned behaviour.
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-opcd-e2-cheatsheet-distill"
+
+# Checkpoint only at the end (keep_last=1). The trainer's maybe_clean() PRESERVES the
+# ~18 GB weight-broadcast on every ckpt-interval step; interval=4 over 40 steps piled
+# up 180 GB+ of broadcasts and filled the disk. interval=max_steps keeps just the
+# final broadcast; the val trajectory still comes from eval (interval=4) which is cheap.
+[ckpt]
+interval = 40
+keep_last = 1
+
+[trainer.ckpt]
+weights_only = true
+interval = 40
+keep_last = 1

@@ -1,0 +1,330 @@
+{
+  "counts": {
+    "train": 2682,
+    "val": 414,
+    "val_ood": 471
+  },
+  "classifier_semantic": {
+    "val": {
+      "acc": 0.8116,
+      "macro_f1": 0.8117,
+      "confusion": [
+        [
+          106,
+          19,
+          13
+        ],
+        [
+          16,
+          119,
+          3
+        ],
+        [
+          13,
+          14,
+          111
+        ]
+      ]
+    },
+    "val_ood": {
+      "acc": 0.8493,
+      "macro_f1": 0.8486,
+      "confusion": [
+        [
+          124,
+          18,
+          15
+        ],
+        [
+          7,
+          143,
+          7
+        ],
+        [
+          15,
+          9,
+          133
+        ]
+      ]
+    }
+  },
+  "classifier_stylometric": {
+    "val": {
+      "acc": 1.0,
+      "macro_f1": 1.0,
+      "confusion": [
+        [
+          138,
+          0,
+          0
+        ],
+        [
+          0,
+          138,
+          0
+        ],
+        [
+          0,
+          0,
+          138
+        ]
+      ]
+    },
+    "val_ood": {
+      "acc": 1.0,
+      "macro_f1": 1.0,
+      "confusion": [
+        [
+          157,
+          0,
+          0
+        ],
+        [
+          0,
+          157,
+          0
+        ],
+        [
+          0,
+          0,
+          157
+        ]
+      ]
+    }
+  },
+  "top_style_features": {
+    "CLAUDE": [
+      [
+        "punc_emdash",
+        2.098
+      ],
+      [
+        "md_bold",
+        0.718
+      ],
+      [
+        "avg_sent_len_words",
+        0.538
+      ],
+      [
+        "digit_ratio",
+        0.429
+      ],
+      [
+        "punc_semicolon",
+        0.212
+      ],
+      [
+        "w_notably",
+        0.191
+      ],
+      [
+        "punc_colon",
+        0.168
+      ],
+      [
+        "punc_dquote",
+        0.154
+      ]
+    ],
+    "CHATGPT": [
+      [
+        "md_h2_h3",
+        0.628
+      ],
+      [
+        "punc_question",
+        0.477
+      ],
+      [
+        "punc_comma",
+        0.431
+      ],
+      [
+        "avg_word_len",
+        0.411
+      ],
+      [
+        "latex",
+        0.356
+      ],
+      [
+        "punc_colon",
+        0.22
+      ],
+      [
+        "punc_semicolon",
+        0.131
+      ],
+      [
+        "md_bullet",
+        0.119
+      ]
+    ],
+    "GEMINI": [
+      [
+        "w_however",
+        1.2
+      ],
+      [
+        "punc_paren",
+        1.163
+      ],
+      [
+        "punc_dquote",
+        0.985
+      ],
+      [
+        "w_furthermore",
+        0.803
+      ],
+      [
+        "avg_sent_len_words",
+        0.68
+      ],
+      [
+        "first_person_we",
+        0.613
+      ],
+      [
+        "upper_ratio",
+        0.597
+      ],
+      [
+        "md_numbered",
+        0.491
+      ]
+    ]
+  },
+  "provider_mean_style": {
+    "CLAUDE": {
+      "avg_sent_len_words": 20.464,
+      "avg_word_len": 5.219,
+      "type_token_ratio": 0.334,
+      "punc_comma": 9.089,
+      "punc_semicolon": 0.584,
+      "punc_colon": 1.473,
+      "punc_emdash": 1.893,
+      "punc_question": 0.267,
+      "punc_exclaim": 0.01,
+      "punc_paren": 1.288,
+      "punc_dquote": 1.982,
+      "md_h1": 0.037,
+      "md_h2_h3": 0.516,
+      "md_bullet": 0.129,
+      "md_numbered": 0.057,
+      "md_bold": 2.07,
+      "md_code": 0.004,
+      "md_table": 0.075,
+      "md_blockquote": 0.012,
+      "latex": 2.291,
+      "ascii_art": 0.057,
+      "first_person_I": 0.139,
+      "first_person_we": 0.532,
+      "w_however": 0.076,
+      "w_moreover": 0.009,
+      "w_furthermore": 0.001,
+      "w_nuanced": 0.014,
+      "w_crucial": 0.151,
+      "w_essentially": 0.118,
+      "w_indeed": 0.051,
+      "w_arguably": 0.088,
+      "w_delve": 0.0,
+      "w_tapestry": 0.001,
+      "w_underscore": 0.002,
+      "w_intricate": 0.011,
+      "w_nevertheless": 0.001,
+      "w_consequently": 0.002,
+      "w_notably": 0.064,
+      "w_ultimately": 0.071,
+      "digit_ratio": 0.004,
+      "upper_ratio": 0.018
+    },
+    "CHATGPT": {
+      "avg_sent_len_words": 12.971,
+      "avg_word_len": 5.659,
+      "type_token_ratio": 0.324,
+      "punc_comma": 11.276,
+      "punc_semicolon": 0.446,
+      "punc_colon": 1.707,
+      "punc_emdash": 0.103,
+      "punc_question": 0.519,
+      "punc_exclaim": 0.003,
+      "punc_paren": 0.303,
+      "punc_dquote": 0.012,
+      "md_h1": 0.034,
+      "md_h2_h3": 0.935,
+      "md_bullet": 0.536,
+      "md_numbered": 0.184,
+      "md_bold": 0.609,
+      "md_code": 0.022,
+      "md_table": 0.288,
+      "md_blockquote": 0.062,
+      "latex": 2.475,
+      "ascii_art": 0.058,
+      "first_person_I": 0.112,
+      "first_person_we": 0.174,
+      "w_however": 0.133,
+      "w_moreover": 0.014,
+      "w_furthermore": 0.001,
+      "w_nuanced": 0.016,
+      "w_crucial": 0.143,
+      "w_essentially": 0.008,
+      "w_indeed": 0.014,
+      "w_arguably": 0.002,
+      "w_delve": 0.0,
+      "w_tapestry": 0.0,
+      "w_underscore": 0.0,
+      "w_intricate": 0.005,
+      "w_nevertheless": 0.003,
+      "w_consequently": 0.0,
+      "w_notably": 0.002,
+      "w_ultimately": 0.028,
+      "digit_ratio": 0.002,
+      "upper_ratio": 0.021
+    },
+    "GEMINI": {
+      "avg_sent_len_words": 18.873,
+      "avg_word_len": 5.438,
+      "type_token_ratio": 0.341,
+      "punc_comma": 8.863,
+      "punc_semicolon": 0.314,
+      "punc_colon": 1.682,
+      "punc_emdash": 0.59,
+      "punc_question": 0.173,
+      "punc_exclaim": 0.011,
+      "punc_paren": 2.692,
+      "punc_dquote": 1.994,
+      "md_h1": 0.04,
+      "md_h2_h3": 0.68,
+      "md_bullet": 0.403,
+      "md_numbered": 0.271,
+      "md_bold": 1.861,
+      "md_code": 0.173,
+      "md_table": 0.841,
+      "md_blockquote": 0.024,
+      "latex": 4.141,
+      "ascii_art": 4.992,
+      "first_person_I": 0.092,
+      "first_person_we": 0.55,
+      "w_however": 0.978,
+      "w_moreover": 0.003,
+      "w_furthermore": 0.271,
+      "w_nuanced": 0.029,
+      "w_crucial": 0.092,
+      "w_essentially": 0.082,
+      "w_indeed": 0.028,
+      "w_arguably": 0.034,
+      "w_delve": 0.005,
+      "w_tapestry": 0.01,
+      "w_underscore": 0.001,
+      "w_intricate": 0.033,
+      "w_nevertheless": 0.004,
+      "w_consequently": 0.128,
+      "w_notably": 0.06,
+      "w_ultimately": 0.183,
+      "digit_ratio": 0.005,
+      "upper_ratio": 0.027
+    }
+  }
+}

@@ -1,0 +1,121 @@
+# E3b — RLSD + TRUST-REGION ANCHOR. Qwen3.5-9B, thinking OFF, 8x H100
+# (4 train FSDP + 4 infer vLLM tp=2).
+#
+# WHY. E3 (rl_3way_rlsd.toml) gave the best reasoning-channel peak we have (val 0.409 at
+# step 12, truncation 38%->9%) but then fell off a cliff into 100% truncation (reward 0)
+# by step 20 — the unconstrained (P_T/P_S)^sign(A) weight amplified a non-terminating mode.
+# This run keeps the SAME verifier-anchored self-distillation signal but adds an explicit
+# trust region (training_mode="rlsd_anchored", rlsd_anchored_loss_fn) to test whether a
+# trust region alone HOLDS the peak:
+#   - distillation-magnitude clip c: 2.0 -> 1.0  (coef in [1/e, e])
+#   - CISPO ratio clip eps: 0.2 -> 0.1
+#   - ratio-based per-token trust-region MASK keyed on the update direction (drop tokens
+#     whose trainer/rollout ratio already moved past 1 +/- 0.1 in the push direction)
+#   - STRONG KL-to-rollout penalty (proper k3 KL, beta 0.5) vs the original near-zero 1e-3.
+# Anchors to the BEHAVIOUR (rollout) policy mu (no frozen reference model is plumbed in
+# prime-rl); mu is regenerated from the live policy each step, so a strong per-step trust
+# region blocks the single-step explosion that caused the E3 cliff.
+#
+# Clean attribution: ONLY the loss-side trust region changes vs E3 — truncation penalty
+# stays OFF and the advantage stays default, so any difference is attributable to the anchor.
+#
+# Launch: uv run rl @ examples/blog_author_id/rl_3way_rlsd_anchored.toml --output-dir outputs/rlsd_anchored_e3b
+
+max_steps = 40
+seq_len = 16384
+
+[model]
+name = "Qwen/Qwen3.5-9B"
+
+[deployment]
+type = "single_node"
+num_train_gpus = 4
+num_infer_gpus = 4
+
+[inference.parallel]
+tp = 2
+
+[inference.server]
+port = 8300  # 8000 is held by a shared service on this box
+
+[inference.model]
+max_model_len = 16384
+reasoning_parser = "None"
+
+[inference]
+# Teacher scoring computes full-vocab prompt_logprobs over (cheat_prompt + completion);
+# leave headroom below the 0.9 default so those logit tensors don't OOM.
+gpu_memory_utilization = 0.65
+
+[trainer.model]
+impl = "hf"
+fused_lm_head_token_chunk_size = "auto"
+
+[trainer.model.ac]
+mode = "full"
+
+[trainer.optim]
+type = "adamw"
+lr = 1e-6
+
+[orchestrator]
+training_mode = "rlsd_anchored"
+batch_size = 144
+group_size = 12  # keep hard-class (CHATGPT) groups MIXED so verifier sign variance survives
+cheatsheet_splice_path = "/home/ubuntu/blogger/prime-rl/data/cheatsheet_splice_3way.json"
+
+[orchestrator.student.client]
+base_url = ["http://localhost:8300/v1"]
+
+[orchestrator.teacher.model]
+name = "Qwen/Qwen3.5-9B"
+
+[orchestrator.teacher.client]
+base_url = ["http://localhost:8300/v1"]
+
+# Default Dr.GRPO advantage: sign(A) = correct-vs-incorrect within a mixed group, the
+# DIRECTION RLSD needs. Truncation penalty kept OFF for clean attribution to the anchor.
+[orchestrator.advantage]
+type = "default"
+
+[orchestrator.renderer]
+name = "qwen3.5"
+enable_thinking = false
+
+[orchestrator.train.sampling]
+temperature = 1.0
+max_completion_tokens = 4096
+
+# Student rolls out PLAIN; cheatsheet only via the teacher scoring path.
+[[orchestrator.train.env]]
+id = "blog-author-id"
+name = "blog-train"
+args = { split = "train", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[orchestrator.eval]
+interval = 4
+group_size = 2
+
+[orchestrator.eval.sampling]
+temperature = 0.7
+top_p = 0.95
+max_completion_tokens = 4096
+
+[[orchestrator.eval.env]]
+id = "blog-author-id"
+name = "blog-val"
+args = { split = "val", data_dir = "/home/ubuntu/blogger/prime-rl/data/blog_author_id_3way_v2", label_scheme = "provider3", require_reason = true, min_reason_words = 12, cheatsheet = false }
+
+[wandb]
+project = "blog-author-id-rl"
+name = "qwen3.5-9b-rlsd-e3b-trust-region-anchor"
+
+# Checkpoint only at the end (keep_last=1) to avoid the broadcast-dir disk fill.
+[ckpt]
+interval = 40
+keep_last = 1
+
+[trainer.ckpt]
+weights_only = true
+interval = 40
+keep_last = 1
