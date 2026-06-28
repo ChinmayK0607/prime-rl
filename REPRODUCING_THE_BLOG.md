@@ -15,10 +15,9 @@ features give a perfect linear probe (1.000 / 1.000) while semantic/content embe
 
 | Document | What it is |
 |---|---|
-| [`EXPERIMENT_BLOG.md`](EXPERIMENT_BLOG.md) | The narrative blog — full arc, Parts I–XVI, every run and what it taught us. |
-| [`RL_LOG.md`](RL_LOG.md) | The dense engineering log — run-by-run diagnostics, decisions, numbers. |
-| **Part XV** (in both) | **Full run ladder**: every run, what changed, W&B link, HF checkpoint + traces links, result. |
-| **Part XIV / XVI** (in both) | What the models learned about the three providers' styles (semantic-space study + trace-level prose analysis). |
+| [`RL_LOG.md`](RL_LOG.md) | The dense engineering log — full arc, Parts I–XVI: run-by-run diagnostics, decisions, numbers. |
+| **Part XV** | **Full run ladder**: every run, what changed, W&B link, HF checkpoint + traces links, result. |
+| **Part XIV / XVI** | What the models learned about the three providers' styles (semantic-space study + trace-level prose analysis). |
 
 If you only read one table, read **Part XV** — it is the index to every run and its artifacts.
 
@@ -43,7 +42,7 @@ deps/research-environments/environments/blog_author_id/
 data/build_blog_*.py                # dataset builders (HF corpus -> train/val/val_ood on disk)
 scripts/                            # eval, trace inference, analysis, model-push tooling
 blog-eval/analysis/                 # style-separation study (figures + JSON) — committed, lightweight
-EXPERIMENT_BLOG.md / RL_LOG.md      # the write-ups
+RL_LOG.md                           # the engineering write-up (Parts I–XVI)
 ```
 
 Heavy artifacts are **not committed** (see `.gitignore`) and live on the Hub instead: the ~300 MB of
@@ -90,7 +89,7 @@ uv run python scripts/infer_traces_allmodels.py \
 
 ## Run → config map
 
-Every experiment in the blog's run ladder corresponds to a config in `examples/blog_author_id/`. Each
+Every experiment in the run ladder corresponds to a config in `examples/blog_author_id/`. Each
 config carries a header comment explaining its hypothesis and exact setup. The most important:
 
 | Run (blog name) | Config | One-line description |
@@ -111,7 +110,7 @@ config carries a header comment explaining its hypothesis and exact setup. The m
 | PVG variants | `rl_3way_pvg_*.toml` | Prover-verifier-game variants (cispo, entropy, entdecay, maxrl, reasongate). |
 | Base / overfit / eval | `rl_3way.toml`, `overfit*.toml`, `eval_ood_best.toml` | Base configs, overfit sanity checks, OOD eval. |
 
-See **Part XV** of the blog/log for each run's W&B link, result, and Hub checkpoint/traces links.
+See **Part XV** of [`RL_LOG.md`](RL_LOG.md) for each run's W&B link, result, and Hub checkpoint/traces links.
 
 ## Data builders (`data/`)
 

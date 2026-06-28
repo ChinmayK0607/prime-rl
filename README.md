@@ -4,8 +4,8 @@
 >
 > **➡️ See [`REPRODUCING_THE_BLOG.md`](REPRODUCING_THE_BLOG.md)** for the full reproduction guide:
 > where every run's config lives, the data builders, the scripts, and links to all models/traces on
-> the Hugging Face Hub. The write-ups are [`EXPERIMENT_BLOG.md`](EXPERIMENT_BLOG.md) and
-> [`RL_LOG.md`](RL_LOG.md) (Part XV = the full run ladder with all artifact links).
+> the Hugging Face Hub. The engineering write-up is [`RL_LOG.md`](RL_LOG.md) (Part XV = the full run
+> ladder with all artifact links).
 >
 > Everything below is the upstream prime-rl README.
 
