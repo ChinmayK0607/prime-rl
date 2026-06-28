@@ -1,81 +1,81 @@
-> ## 📝 This fork: reproducing the blog
-> This is a **research fork of prime-rl** used for the blog/log on training **Qwen3.5-9B (thinking OFF)**
-> to identify whether a blog post was authored by **CLAUDE / CHATGPT / GEMINI**.
->
-> **➡️ See [`REPRODUCING_THE_BLOG.md`](REPRODUCING_THE_BLOG.md)** for the full reproduction guide:
-> where every run's config lives, the data builders, the scripts, and links to all models/traces on
-> the Hugging Face Hub. The engineering write-up is [`RL_LOG.md`](RL_LOG.md) (Part XV = the full run
-> ladder with all artifact links).
->
-> Everything below is the upstream prime-rl README.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/40c36e38-c5bd-4c5a-9cb3-f7b902cd155d#gh-light-mode-only" alt="Prime Intellect" width="180">
+  <img src="https://github.com/user-attachments/assets/6414bc9b-126b-41ca-9307-9e982430cde8#gh-dark-mode-only"  alt="Prime Intellect" width="180">
+</p>
+
+<h1 align="center">Who wrote this blog?</h1>
+<h3 align="center">RL on the writing style of CLAUDE · CHATGPT · GEMINI</h3>
+
+<p align="center"><i>A research fork of <a href="https://github.com/PrimeIntellect-ai/prime-rl">prime-rl</a> — framework setup is preserved in <a href="#setup-built-on-prime-rl">Setup</a> below.</i></p>
 
 ---
 
-<p align="center">
-</p>
+We train **Qwen3.5-9B (thinking OFF)** on a single 8×H100 node to read a ~3000-word blog post and name
+which assistant wrote it — **CLAUDE**, **CHATGPT**, or **GEMINI** — and study what each training recipe
+actually learns about their writing styles.
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/40c36e38-c5bd-4c5a-9cb3-f7b902cd155d#gh-light-mode-only" alt="Prime Intellect" width="312">
-  <img src="https://github.com/user-attachments/assets/6414bc9b-126b-41ca-9307-9e982430cde8#gh-dark-mode-only"  alt="Prime Intellect" width="312">
-</p>
+📖 **Full write-up:** [`RL_LOG.md`](RL_LOG.md) (the engineering blog, Parts I–XVI) &nbsp;·&nbsp;
+🧭 **Exhaustive run/config/script index:** [`REPRODUCING_THE_BLOG.md`](REPRODUCING_THE_BLOG.md)
+
+## Headline findings
+
+- **Answer-only SFT solves the task** — val / val_ood = **1.000 / 1.000**.
+- **Reasoning-channel RL from a base init reliably collapses** (truncation → 100%, accuracy → ~0) on
+  every distillation/shaping variant we tried (OPCD, RLSD, cheatsheet, lexical).
+- **A light reasoning cold-start fixes it**: 60 SFT steps → control GRPO climbs to **~0.91 with 0 %
+  truncation and never collapses** (reproduced across seeds).
+- **It's style, not content**: ~40 stylometric features give a **perfect linear probe (1.000 / 1.000)**
+  while semantic/content embeddings intermix the providers — Claude = em-dashes + sincere essay voice;
+  ChatGPT = hedged, header/list structure; Gemini = intensifiers + ASCII/LaTeX density.
+
+## Results at a glance
+
+| Model | Training | val | val_ood |
+|---|---|---|---|
+| `selfgated-answeronly` / `sft-goldcond` | answer-only / gold-conditioned SFT | **1.000** | **1.000** |
+| `star-selfdistill` | STaR self-distillation | 0.952 | 0.960 |
+| `coldstart-rl` ★ | SFT-60 cold-start → control GRPO | 0.911 | 0.919 |
+| `coldstart-sft` | 60-step SFT only (the RL init) | 0.696 | 0.682 |
+| `rl-pureacc` / `rl-cheatsheet` / `rl-entropydecay` | reasoning-channel RL (base init) | 0.29–0.38 | 0.30–0.38 |
+| `rlsd-e3` / `opcd-e2` | verifier-/context-distillation (collapsed) | ~0.00 | ~0.00 |
+
+Full ladder with W&B + Hub links is **Part XV** of [`RL_LOG.md`](RL_LOG.md).
+
+## Artifacts on the Hugging Face Hub
+
+| Artifact | Link |
+|---|---|
+| Source blog corpus | [`anonymousNeurIPS2026submission4281/copilot-sdk-blogs`](https://huggingface.co/datasets/anonymousNeurIPS2026submission4281/copilot-sdk-blogs) |
+| Trained models (10 repos) | [`CK0607`](https://huggingface.co/CK0607) — `qwen3.5-9b-blogprovider-*` |
+| Inference traces + style study | [`CK0607/qwen3.5-9b-blogprovider-traces`](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces) |
+
+## Quickstart (the experiments)
+
+```bash
+# 0. Framework setup — see "Setup (built on prime-rl)" below, then install the env:
+uv pip install -e deps/research-environments/environments/blog_author_id
+
+# 1. Build the data splits from the HF corpus (writes data/blog_author_id_3way/{train,val,val_ood})
+uv run python data/build_blog_split_3way.py
+
+# 2. Launch a run (8x H100; trainer + vLLM colocated, RL inference server on port 8300)
+uv run rl @ examples/blog_author_id/rl_3way_coldstart.toml --output-dir outputs/coldstart_rl
+
+# 3. Trace a checkpoint on val + val_ood (writes blog-eval/traces/<name>/)
+uv run python scripts/infer_traces_allmodels.py \
+    --repo outputs/coldstart_rl/weights/step_40 \
+    --short qwen3.5-9b-blogprovider-coldstart-rl --render_model Qwen/Qwen3.5-9B
+```
+
+Every run's config lives in [`examples/blog_author_id/`](examples/blog_author_id) and the
+[reproduction guide](REPRODUCING_THE_BLOG.md) maps each one to its hypothesis, data builder, scripts,
+and Hub artifacts.
 
 ---
 
-<h3 align="center">
-PRIME-RL: Async RL Training at Scale
-</h3>
+## Setup (built on prime-rl)
 
----
-
-</br>
-<p align="center">
-  <a href="https://github.com/PrimeIntellect-ai/prime-rl/actions/workflows/style.yaml">
-    <img src="https://github.com/PrimeIntellect-ai/prime-rl/actions/workflows/style.yaml/badge.svg" alt="Style" />
-  </a>
-  <a href="https://github.com/PrimeIntellect-ai/prime-rl/actions/workflows/cpu_tests.yaml">
-    <img src="https://github.com/PrimeIntellect-ai/prime-rl/actions/workflows/cpu_tests.yaml/badge.svg" alt="Test" />
-  </a>
-  <a href="https://github.com/PrimeIntellect-ai/prime-rl/actions/workflows/gpu_tests.yaml">
-    <img src="https://github.com/PrimeIntellect-ai/prime-rl/actions/workflows/gpu_tests.yaml/badge.svg" alt="Test" />
-  </a>
-</p>
-
-## Overview
-
-PRIME-RL is a framework for large-scale reinforcement learning. It is designed to be easy to use and hackable, yet capable of scaling to 1000+ GPUs. Here is what we think sets it apart:
-
-1. Fully asynchronous RL for high-throughput agentic training at scale.
-2. Performant: built to train 1T+ MoE models on 1000+ GPUs with [FSDP2](https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html) for training and [vLLM](https://github.com/vllm-project/vllm) for inference, with FP8 inference, PD disaggregation, EP and CP parallelism, and more.
-3. Native integration with [`verifiers`](https://github.com/PrimeIntellect-ai/verifiers) environments through the [Environments Hub](https://app.primeintellect.ai/dashboard/environments?ex_sort=most_stars), including built-in support for SWE and agentic environments.
-4. End-to-end post-training: SFT, RL training, and evals.
-5. Multi-node deployment with Slurm and Kubernetes support.
-6. Multimodal support for VLMs such as Qwen3-VL.
-7. Hackable, modular, and extensible by design.
-
-
-## Models support
-
-
-The trainer works with both Hugging Face and Prime custom `ModelForCausalLM` out of the box. For selected families (especially large MoE) we also ship highly optimized training code under `src/prime_rl/trainer/models/`, including expert parallelism (EP) for MoE layers and context parallelism (CP) for long sequences (see the table), and additional kernels like [quack-kernels](https://github.com/quack-kernels/quack-kernels).
-
-With `[model] impl = "auto"` (the default), the trainer selects that custom stack when the Hugging Face config type is registered.
-
-| Family | Example IDs | MoE | EP | CP |
-|--------|-------------|-----|----|-----|
-| GLM-5 (`glm_moe_dsa`) | `zai-org/GLM-5`, `zai-org/GLM-5-FP8` | yes | ✅ | ✅ |
-| Qwen3 MoE (`qwen3_moe`) | `Qwen/Qwen3-30B-A3B`, … | yes | ✅ | ✅ |
-| Qwen3.5 MoE (`qwen3_5_moe`) | `Qwen/Qwen3.5-35B-A3B`, … | yes | ✅ | ✅ |
-| Qwen3 / Qwen3.5 VLMs | see [advanced.md](docs/advanced.md#vision-language-models) (`qwen3_vl`, `qwen3_5`, `qwen3_5_moe`) | MoE only on MoE VLMs | MoE only | ✅ |
-| Poolside Laguna (`laguna`) | `poolside/Laguna-XS.2` | yes | ✅ | ✅ |
-| MiniMax M2 (`minimax_m2`) | `MiniMax/MiniMax-M2` | yes | ✅ | ✅ |
-| Nemotron H (`nemotron_h`) | `nvidia/Nemotron-3-Nano-30B-A3B`, `nvidia/Nemotron-3-Super-120B-A12B`, … | yes | ✅ | ✅ |
-| Trinity (`afmoe`) | `arcee-ai/Trinity-Mini`, … | yes | ✅ | ✅ |
-| GLM-4 · GLM-4.5 MoE · INTELLECT-3 (`glm4_moe`) | `THUDM/GLM-4-9B-0414`, `zai-org/GLM-4.5-Air`, `zai-org/GLM-4.5`, `PrimeIntellect/INTELLECT-3`, … | yes | ✅ | ✅ |
-| GPT-OSS (HF, MoE) | `openai/gpt-oss-20b`, `openai/gpt-oss-120b` | yes |  ✅ | ✅ |
-| Other HF causal LMs | Qwen3 dense, Mistral, … (`impl = "hf"`) | varies | ❌ | ✅ |
-
-
-## Setup
+This repo is a fork of [prime-rl](https://github.com/PrimeIntellect-ai/prime-rl) (async RL at scale); the experiments above use its SFT/RL trainer and vLLM inference unchanged except for the distillation hooks noted in the [reproduction guide](REPRODUCING_THE_BLOG.md). The original prime-rl setup follows.
 
 > *We develop and test on NVIDIA RTX 3090/4090/5090, A100, H100, H200, and B200. If your setup fails, please create an [issue](https://github.com/PrimeIntellect-ai/prime-rl/issues).*
 
