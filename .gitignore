@@ -224,3 +224,6 @@ data/blog_author_id_overfit*/
 data/blog_sft*/
 # Stray HF arrow caches
 data/**/cache-*.arrow
+
+# Narrative blog kept local-only (not published in this repo)
+EXPERIMENT_BLOG.md
