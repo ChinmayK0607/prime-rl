@@ -45,7 +45,7 @@ Full ladder with W&B + Hub links is **Part XV** of [`RL_LOG.md`](RL_LOG.md).
 
 | Artifact | Link |
 |---|---|
-| Source blog corpus | [`anonymousNeurIPS2026submission4281/copilot-sdk-blogs`](https://huggingface.co/datasets/anonymousNeurIPS2026submission4281/copilot-sdk-blogs) |
+| Source blog corpus | [`Samarth0710/copilot-sdk-blogs`](https://huggingface.co/datasets/Samarth0710/copilot-sdk-blogs) |
 | Trained models (10 repos) | [`CK0607`](https://huggingface.co/CK0607) — `qwen3.5-9b-blogprovider-*` |
 | Inference traces + style study | [`CK0607/qwen3.5-9b-blogprovider-traces`](https://huggingface.co/datasets/CK0607/qwen3.5-9b-blogprovider-traces) |
 
